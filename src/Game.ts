@@ -10,7 +10,7 @@ import IRenderable from './gameobjects/IRenderable';
 
 export default class Game extends EventEmitter
 {
-    VERSION: string = '4.0.0-beta3';
+    VERSION: string = '4.0.0-beta1';
 
     config: IGameConfig;
 

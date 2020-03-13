@@ -6,7 +6,9 @@
         "prepublishOnly": "echo \"Error: Don't run 'npm publish' in root. Use 'npm run dist' instead.\" && exit 1",
         "build": "rollup -c rollup.config.js",
         "watch": "tsc --watch --pretty",
-        "dist": "npm run build && cd dist && npm publish --ignore-scripts"
+        "dist": "npm run build && cd dist && npm publish --ignore-scripts",
+        "build-examples": "rollup -c examples.rollup.config.js",
+        "watch-examples": "rollup --watch -c examples.rollup.config.js"
     },
     "repository": {
         "type": "git",
