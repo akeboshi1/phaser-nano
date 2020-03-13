@@ -1,8 +1,8 @@
 (function (global, factory) {
-    typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
-    typeof define === 'function' && define.amd ? define(factory) :
-    (global = global || self, global.Phaser4Nano = factory());
-}(this, (function () { 'use strict';
+    typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+    typeof define === 'function' && define.amd ? define(['exports'], factory) :
+    (global = global || self, factory(global.Phaser4Nano = {}));
+}(this, (function (exports) { 'use strict';
 
     function AlphaComponent(Base) {
         return class AlphaComponent extends Base {
@@ -886,7 +886,7 @@
 
 
 
-    var Components = /*#__PURE__*/Object.freeze({
+    var index = /*#__PURE__*/Object.freeze({
         __proto__: null,
         AlphaComponent: AlphaComponent,
         AnimationComponent: AnimationComponent,
@@ -1181,7 +1181,7 @@
         }
     }
 
-    var index = {
+    var index$1 = {
         AnimatedSprite,
         Camera,
         Container,
@@ -1190,9 +1190,9 @@
         World
     };
 
-    var GameObjects = /*#__PURE__*/Object.freeze({
+    var index$2 = /*#__PURE__*/Object.freeze({
         __proto__: null,
-        'default': index
+        'default': index$1
     });
 
     function AppendMatrix2d(mat1, mat2) {
@@ -1371,7 +1371,7 @@
         }
     }
 
-    var index$1 = {
+    var index$3 = {
         AppendMatrix2d,
         Ease,
         GlobalToLocal,
@@ -1379,9 +1379,9 @@
         Vec2
     };
 
-    var Math$1 = /*#__PURE__*/Object.freeze({
+    var index$4 = /*#__PURE__*/Object.freeze({
         __proto__: null,
-        'default': index$1
+        'default': index$3
     });
 
     function AtlasParser (texture, data) {
@@ -1544,7 +1544,7 @@
         }
     }
 
-    var index$2 = {
+    var index$5 = {
         AtlasParser,
         Frame,
         SpriteSheetParser,
@@ -1552,9 +1552,9 @@
         TextureManager
     };
 
-    var Textures = /*#__PURE__*/Object.freeze({
+    var index$6 = /*#__PURE__*/Object.freeze({
         __proto__: null,
-        'default': index$2
+        'default': index$5
     });
 
     function DOMContentLoaded(callback) {
@@ -2463,18 +2463,16 @@ void main (void)
         }
     }
 
-    var index$3 = {
-        Game,
-        Scene,
-        Components,
-        EventEmitter,
-        GameObjects,
-        Loader,
-        Math: Math$1,
-        WebGLRenderer,
-        Textures
-    };
+    exports.Components = index;
+    exports.EventEmitter = EventEmitter;
+    exports.Game = Game;
+    exports.GameObjects = index$2;
+    exports.Loader = Loader;
+    exports.Math = index$4;
+    exports.Scene = Scene;
+    exports.Textures = index$6;
+    exports.WebGLRenderer = WebGLRenderer;
 
-    return index$3;
+    Object.defineProperty(exports, '__esModule', { value: true });
 
 })));

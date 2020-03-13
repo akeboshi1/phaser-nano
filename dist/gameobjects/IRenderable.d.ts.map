@@ -1,1 +1,1 @@
-{"version":3,"file":"IRenderable.d.ts","sourceRoot":"","sources":["../src/gameobjects/IRenderable.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,iBAAiB,EAAE,oBAAoB,EAAE,MAAM,eAAe,CAAC;AAExE,MAAM,CAAC,OAAO,WAAW,WAAY,SACjC,iBAAiB,EACjB,oBAAoB;CAClB"}
+{"version":3,"file":"IRenderable.d.ts","sourceRoot":"","sources":["../../src/gameobjects/IRenderable.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,iBAAiB,EAAE,oBAAoB,EAAE,MAAM,eAAe,CAAC;AAExE,MAAM,CAAC,OAAO,WAAW,WAAY,SACjC,iBAAiB,EACjB,oBAAoB;CAClB"}

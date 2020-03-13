@@ -1,1 +1,1 @@
-{"version":3,"file":"Install.d.ts","sourceRoot":"","sources":["../src/components/Install.ts"],"names":[],"mappings":"AAAA,MAAM,CAAC,OAAO,UAAU,OAAO,CAAE,SAAS,EAAE,GAAG,EAAE,UAAU,EAAE,GAAG,EAAE,OAWjE"}
+{"version":3,"file":"Install.d.ts","sourceRoot":"","sources":["../../src/components/Install.ts"],"names":[],"mappings":"AAAA,MAAM,CAAC,OAAO,UAAU,OAAO,CAAE,SAAS,EAAE,GAAG,EAAE,UAAU,EAAE,GAAG,EAAE,OAWjE"}

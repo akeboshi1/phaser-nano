@@ -1,0 +1,1 @@
+{"version":3,"file":"SceneComponent.js","sourceRoot":"","sources":["../../src/components/SceneComponent.ts"],"names":[],"mappings":"AAIA,MAAM,UAAU,cAAc,CAA4B,IAAW;IAEjE,OAAO,MAAM,cAAe,SAAQ,IAAI;QAIpC,QAAQ,CAAE,KAAY;YAElB,IAAI,CAAC,KAAK,GAAG,KAAK,CAAC;YAEnB,OAAO,IAAI,CAAC;QAChB,CAAC;KACJ,CAAC;AACN,CAAC"}

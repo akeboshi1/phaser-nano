@@ -6,8 +6,8 @@ export declare function DirtyComponent<TBase extends SceneChild>(Base: TBase): {
         dirty: boolean;
         dirtyFrame: number;
         setDirty(setFrame?: boolean): any;
-        scene: import("../Scene").default;
-        setScene(scene: import("../Scene").default): any;
+        scene: import("..").Scene;
+        setScene(scene: import("..").Scene): any;
     };
 } & TBase;
 export interface IDirtyComponent {

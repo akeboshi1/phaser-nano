@@ -8,7 +8,7 @@ import EventEmitter from './core/EventEmitter';
 import Loader from './loader/Loader';
 import WebGLRenderer from './renderer/WebGLRenderer';
 
-export default {
+export {
     Game,
     Scene,
     Components,

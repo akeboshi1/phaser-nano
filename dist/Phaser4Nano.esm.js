@@ -880,7 +880,7 @@ function VisibleComponent(Base) {
 
 
 
-var Components = /*#__PURE__*/Object.freeze({
+var index = /*#__PURE__*/Object.freeze({
     __proto__: null,
     AlphaComponent: AlphaComponent,
     AnimationComponent: AnimationComponent,
@@ -1175,7 +1175,7 @@ class World extends Container {
     }
 }
 
-var index = {
+var index$1 = {
     AnimatedSprite,
     Camera,
     Container,
@@ -1184,9 +1184,9 @@ var index = {
     World
 };
 
-var GameObjects = /*#__PURE__*/Object.freeze({
+var index$2 = /*#__PURE__*/Object.freeze({
     __proto__: null,
-    'default': index
+    'default': index$1
 });
 
 function AppendMatrix2d(mat1, mat2) {
@@ -1365,7 +1365,7 @@ function Ease(progress, easing) {
     }
 }
 
-var index$1 = {
+var index$3 = {
     AppendMatrix2d,
     Ease,
     GlobalToLocal,
@@ -1373,9 +1373,9 @@ var index$1 = {
     Vec2
 };
 
-var Math$1 = /*#__PURE__*/Object.freeze({
+var index$4 = /*#__PURE__*/Object.freeze({
     __proto__: null,
-    'default': index$1
+    'default': index$3
 });
 
 function AtlasParser (texture, data) {
@@ -1538,7 +1538,7 @@ class TextureManager {
     }
 }
 
-var index$2 = {
+var index$5 = {
     AtlasParser,
     Frame,
     SpriteSheetParser,
@@ -1546,9 +1546,9 @@ var index$2 = {
     TextureManager
 };
 
-var Textures = /*#__PURE__*/Object.freeze({
+var index$6 = /*#__PURE__*/Object.freeze({
     __proto__: null,
-    'default': index$2
+    'default': index$5
 });
 
 function DOMContentLoaded(callback) {
@@ -2457,17 +2457,5 @@ class Scene {
     }
 }
 
-var index$3 = {
-    Game,
-    Scene,
-    Components,
-    EventEmitter,
-    GameObjects,
-    Loader,
-    Math: Math$1,
-    WebGLRenderer,
-    Textures
-};
-
-export default index$3;
+export { index as Components, EventEmitter, Game, index$2 as GameObjects, Loader, index$4 as Math, Scene, index$6 as Textures, WebGLRenderer };
 //# sourceMappingURL=Phaser4Nano.esm.js.map

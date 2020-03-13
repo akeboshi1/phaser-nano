@@ -7,16 +7,5 @@ import Scene from './Scene';
 import EventEmitter from './core/EventEmitter';
 import Loader from './loader/Loader';
 import WebGLRenderer from './renderer/WebGLRenderer';
-declare const _default: {
-    Game: typeof Game;
-    Scene: typeof Scene;
-    Components: typeof Components;
-    EventEmitter: typeof EventEmitter;
-    GameObjects: typeof GameObjects;
-    Loader: typeof Loader;
-    Math: typeof Math;
-    WebGLRenderer: typeof WebGLRenderer;
-    Textures: typeof Textures;
-};
-export default _default;
+export { Game, Scene, Components, EventEmitter, GameObjects, Loader, Math, WebGLRenderer, Textures };
 //# sourceMappingURL=index.d.ts.map

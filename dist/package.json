@@ -1,0 +1,25 @@
+{
+    "name": "@phaserjs/phaser-nano",
+    "version": "0.0.6",
+    "description": "Phaser 4 Nano",
+    "publishConfig": {
+        "access": "public"
+    },
+    "main": "index.js",
+    "module": "index.js",
+    "types": "index.d.ts",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/phaserjs/phaser-nano.git"
+    },
+    "keywords": [
+        "Phaser"
+    ],
+    "author": "Richard Davey <rich@photonstorm.com> (http://www.photonstorm.com)",
+    "license": "MIT",
+    "licenseUrl": "http://www.opensource.org/licenses/mit-license.php",
+    "bugs": {
+        "url": "https://github.com/phaserjs/phaser-nano/issues"
+    },
+    "homepage": "https://github.com/phaserjs/phaser-nano#readme"
+}

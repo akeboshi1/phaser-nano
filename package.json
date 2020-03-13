@@ -1,16 +1,12 @@
 {
-    "name": "phaser-nano",
-    "version": "0.0.1",
+    "name": "@phaserjs/phaser-nano",
+    "version": "1.0.0",
     "description": "Phaser 4 Nano",
-    "publishConfig": {
-        "access": "public"
-    },
-    "module": "dist/Phaser4Nano.esm.js",
-    "types": "dist/index.d.ts",
     "scripts": {
-        "build": "tsc -- build tsconfig.json",
-        "build2": "rollup -c rollup.config.js",
-        "watch": "rollup --watch -c rollup.config.js"
+        "prepublishOnly": "echo \"Error: Don't run 'npm publish' in root. Use 'npm run dist' instead.\" && exit 1",
+        "build": "rollup -c rollup.config.js",
+        "watch": "tsc --watch --pretty",
+        "dist": "npm run build && cd dist && npm publish --ignore-scripts"
     },
     "repository": {
         "type": "git",
@@ -30,10 +26,13 @@
         "rollup": "^2.0.6",
         "rollup-plugin-banner": "^0.2.1",
         "rollup-plugin-clear": "^2.0.7",
+        "rollup-plugin-command": "^1.1.2",
+        "rollup-plugin-copy": "^3.3.0",
         "rollup-plugin-filesize": "^6.2.1",
         "rollup-plugin-node-resolve": "^5.2.0",
         "rollup-plugin-terser": "^5.3.0",
         "rollup-plugin-typescript2": "^0.26.0",
+        "rollup-plugin-visualizer": "^3.3.1",
         "typescript": "^3.8.3",
         "uplot": "^1.0.2"
     }

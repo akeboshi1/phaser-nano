@@ -3,8 +3,9 @@ import resolve from 'rollup-plugin-node-resolve';
 import typescript from 'rollup-plugin-typescript2';
 import { terser } from 'rollup-plugin-terser';
 import filesize from 'rollup-plugin-filesize';
-// import banner from 'rollup-plugin-banner';
-// import path from 'path';
+import copy from 'rollup-plugin-copy';
+import command from 'rollup-plugin-command';
+import visualizer from 'rollup-plugin-visualizer';
 
 const extensions = [
     '.js', '.jsx', '.ts', '.tsx'
@@ -23,13 +24,25 @@ export default {
         {
             file: './dist/Phaser4Nano.js',
             format: 'umd',
-            name: 'Phaser4Nano'
+            name: 'Phaser4Nano',
+            sourcemap: false,
+            plugins: [
+                filesize()
+            ]
         },
         {
             file: './dist/Phaser4Nano.min.js',
             format: 'umd',
             name: 'Phaser4Nano',
-            plugins: [ terser() ]
+            sourcemap: false,
+            plugins: [
+                terser(),
+
+                command([
+                    `echo "Running tsc ..."`,
+                    `tsc`
+                ])
+            ]
         }
     ],
 
@@ -60,14 +73,17 @@ export default {
             tsconfig: './tsconfig.json'
         }),
 
-        //  Messes-up the sourcemap
-        // banner({
-        //     file: path.join(__dirname, 'banner.txt'),
-        //     encoding: 'utf-8'
-        // }),
+        copy({
+            targets: [
+                { src: 'dist.package.json', dest: 'dist', rename: 'package.json' }
+            ]
+        }),
 
-        //  Current version requires onwarn override handler
-        filesize()
+        visualizer({
+            "title": "Phaser 4 Nano Package Stats",
+            "sourcemap": false,
+            "template": "treemap" // "circlepacking"
+        })
 
     ]
 
