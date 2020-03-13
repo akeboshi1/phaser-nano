@@ -1,0 +1,1 @@
+{"version":3,"file":"GameObject.d.ts","sourceRoot":"","sources":["../src/gameobjects/GameObject.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,UAAU,CAAC;AAG7B,OAAO,WAAW,MAAM,eAAe,CAAC;;AAExC,MAAM,CAAC,OAAO,OAAO,UAAW,SAAQ,eActC;gBAEe,KAAK,EAAE,KAAK,EAAE,CAAC,GAAE,MAAU,EAAE,CAAC,GAAE,MAAU;CAS1D;AAED,MAAM,CAAC,OAAO,WAAW,UAAW,SAAQ,WAAW;CAAG"}

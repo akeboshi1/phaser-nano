@@ -1,0 +1,40 @@
+{
+    "name": "phaser-nano",
+    "version": "0.0.1",
+    "description": "Phaser 4 Nano",
+    "publishConfig": {
+        "access": "public"
+    },
+    "module": "dist/Phaser4Nano.esm.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc -- build tsconfig.json",
+        "build2": "rollup -c rollup.config.js",
+        "watch": "rollup --watch -c rollup.config.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/phaserjs/phaser-nano.git"
+    },
+    "keywords": [
+        "Phaser"
+    ],
+    "author": "Richard Davey <rich@photonstorm.com> (http://www.photonstorm.com)",
+    "license": "MIT",
+    "licenseUrl": "http://www.opensource.org/licenses/mit-license.php",
+    "bugs": {
+        "url": "https://github.com/phaserjs/phaser-nano/issues"
+    },
+    "homepage": "https://github.com/phaserjs/phaser-nano#readme",
+    "devDependencies": {
+        "rollup": "^2.0.6",
+        "rollup-plugin-banner": "^0.2.1",
+        "rollup-plugin-clear": "^2.0.7",
+        "rollup-plugin-filesize": "^6.2.1",
+        "rollup-plugin-node-resolve": "^5.2.0",
+        "rollup-plugin-terser": "^5.3.0",
+        "rollup-plugin-typescript2": "^0.26.0",
+        "typescript": "^3.8.3",
+        "uplot": "^1.0.2"
+    }
+}
