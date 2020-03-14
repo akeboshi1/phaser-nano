@@ -211,7 +211,7 @@ export default class WebGLRenderer
         return glTexture;
     }
 
-    render (list: IRenderable[], camera: Camera, dirtyFrame: number)
+    render (sceneList: any[], dirtyFrame: number)
     {
         if (this.contextLost)
         {
@@ -247,57 +247,67 @@ export default class WebGLRenderer
             gl.clear(gl.COLOR_BUFFER_BIT);
         }
 
-        shader.bind(camera);
-
-        //  Process the render list
         const maxTextures = this.maxTextures;
         const activeTextures = this.activeTextures;
         const startActiveTexture = this.startActiveTexture;
 
-        for (let i: number = 0; i < list.length; i++)
+        for (let c: number = 0; c < sceneList.length; c += 2)
         {
-            let entity = list[i];
+            let camera = sceneList[c];
+            let list: IRenderable[] = sceneList[c + 1];
 
-            let texture = entity.texture;
+            //  TODO - This only needs binding if
+            //  the camera matrix is different to before
+            shader.bind(camera);
 
-            if (texture.glIndexCounter < startActiveTexture)
+            //  Process the render list
+            for (let i: number = 0; i < list.length; i++)
             {
-                texture.glIndexCounter = startActiveTexture;
+                let entity = list[i];
 
-                if (this.currentActiveTexture < maxTextures)
+                let texture = entity.texture;
+
+                if (texture.glIndexCounter < startActiveTexture)
                 {
-                    //  Make this texture active
-                    activeTextures[this.currentActiveTexture] = texture;
+                    texture.glIndexCounter = startActiveTexture;
 
-                    texture.glIndex = this.currentActiveTexture;
+                    if (this.currentActiveTexture < maxTextures)
+                    {
+                        //  Make this texture active
+                        activeTextures[this.currentActiveTexture] = texture;
 
-                    gl.activeTexture(gl.TEXTURE0 + this.currentActiveTexture);
-                    gl.bindTexture(gl.TEXTURE_2D, texture.glTexture);
+                        texture.glIndex = this.currentActiveTexture;
 
-                    this.currentActiveTexture++;
+                        gl.activeTexture(gl.TEXTURE0 + this.currentActiveTexture);
+                        gl.bindTexture(gl.TEXTURE_2D, texture.glTexture);
+
+                        this.currentActiveTexture++;
+                    }
+                    else
+                    {
+                        //  We've run out, flush + recycle the oldest one
+                        //  TODO
+                    }
                 }
-                else
+
+                /*
+                if (entity.type === 'SpriteBuffer')
                 {
-                    //  We've run out, flush + recycle the oldest one
-                    //  TODO
+                    if (shader.batchSpriteBuffer(entity as SpriteBuffer))
+                    {
+                        //  Reset active textures
+                        this.currentActiveTexture = 0;
+                        this.startActiveTexture++;
+                    }
                 }
+                */
+
+                shader.batchSprite(entity as ISprite);
             }
 
-            /*
-            if (entity.type === 'SpriteBuffer')
-            {
-                if (shader.batchSpriteBuffer(entity as SpriteBuffer))
-                {
-                    //  Reset active textures
-                    this.currentActiveTexture = 0;
-                    this.startActiveTexture++;
-                }
-            }
-            */
-
-            shader.batchSprite(entity as ISprite);
+            //  This only needs flushing if the next
+            //  Scene has a different camera matrix
+            shader.flush();
         }
-
-        shader.flush();
     }
 }
