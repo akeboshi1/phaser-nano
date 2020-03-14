@@ -14,4 +14,6 @@ export default interface IGameObject extends
     Components.ISkewComponent,
     Components.ITransformComponent,
     Components.IVisibleComponent
-    {}
+    {
+        name?: string;
+    }

@@ -26,6 +26,7 @@ export default class GameObject extends Install(class {}, [
         this.scene = scene;
         this._position.set(x, y);
         this.dirty = true;
+        this.name = '';
     }
 
 };
