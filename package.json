@@ -7,6 +7,7 @@
         "build": "rollup -c rollup.config.js",
         "watch": "tsc --watch --pretty",
         "dist": "npm run build && cd dist && npm publish --ignore-scripts",
+        "dist-examples": "rollup -c examples.dist.rollup.config.js",
         "build-examples": "rollup -c examples.rollup.config.js",
         "watch-examples": "rollup --watch -c examples.rollup.config.js"
     },

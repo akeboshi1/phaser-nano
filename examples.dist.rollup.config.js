@@ -1,7 +1,7 @@
 import resolve from 'rollup-plugin-node-resolve';
 import typescript from 'rollup-plugin-typescript2';
-// import { terser } from 'rollup-plugin-terser';
-// import filesize from 'rollup-plugin-filesize';
+import { terser } from 'rollup-plugin-terser';
+import filesize from 'rollup-plugin-filesize';
 
 const extensions = [
     '.js', '.jsx', '.ts', '.tsx'
@@ -13,13 +13,13 @@ export default {
 
     output: [
         {
-            file: './examples/index.js',
+            file: './examples/index.min.js',
             format: 'iife',
             name: 'Phaser4NanoExample',
             sourcemap: true,
             plugins: [
-                // terser(),
-                // filesize()
+                terser(),
+                filesize()
             ]
         }
     ],
