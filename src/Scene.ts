@@ -1,26 +1,18 @@
 import Game from './Game';
-import Loader from './loader/Loader';
-import TextureManager from './textures/TextureManager';
-import Camera from './gameobjects/Camera';
 import World from './gameobjects/World';
 
 export default class Scene
 {
-    camera: Camera;
     game: Game;
-    load: Loader;
-    textures: TextureManager;
     world: World;
 
-    constructor (game: Game)
+    constructor (game: Game, key: string = 'default')
     {
         this.game = game;
-        this.load = game.loader;
-        this.textures = game.textures;
-        this.world = new World(this);
-        this.camera = new Camera(this, 0, 0);
+        this.world = new World(this, key);
     }
 
+    /*
     init ()
     {
     }
@@ -36,5 +28,6 @@ export default class Scene
     update (delta?: number, time?: number)
     {
     }
+    */
 
 }
