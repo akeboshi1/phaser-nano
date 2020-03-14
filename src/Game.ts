@@ -1,12 +1,10 @@
 import DOMContentLoaded from './core/DOMContentLoaded';
 import AddToDOM from './core/AddToDOM';
 import WebGLRenderer from './renderer/WebGLRenderer';
-import Loader from './loader/Loader';
 import SceneManager from './scenes/SceneManager';
 import TextureManager from './textures/TextureManager';
 import IGameConfig from './IGameConfig';
 import EventEmitter from './core/EventEmitter';
-import IRenderable from './gameobjects/IRenderable';
 
 export default class Game extends EventEmitter
 {
@@ -17,7 +15,6 @@ export default class Game extends EventEmitter
     isPaused: boolean = false;
     isBooted: boolean = false;
 
-    loader: Loader;
     scenes: SceneManager;
     textures: TextureManager;
     renderer: WebGLRenderer;
@@ -28,12 +25,6 @@ export default class Game extends EventEmitter
 
     //  The current game frame
     frame: number = 0;
-
-    //  How many Game Objects were made dirty this frame?
-    dirtyFrame: number = 0;
-
-    //  How many Game Objects were processed this frame?
-    totalFrame: number = 0;
 
     constructor (config?: IGameConfig)
     {
@@ -70,13 +61,10 @@ export default class Game extends EventEmitter
 
     boot ()
     {
+        const config = this.config;
+
         this.isBooted = true;
         this.lastTick = Date.now();
-
-        this.textures = new TextureManager(this);
-        this.loader = new Loader(this);
-
-        const config = this.config;
 
         const renderer = new WebGLRenderer(config.width, config.height);
 
@@ -85,6 +73,8 @@ export default class Game extends EventEmitter
         AddToDOM(renderer.canvas, config.parent);
 
         this.renderer = renderer;
+        this.textures = new TextureManager(this);
+        this.scenes = new SceneManager(this, config.scene);
 
         this.banner(this.VERSION);
 
@@ -107,29 +97,7 @@ export default class Game extends EventEmitter
         // window.addEventListener('blur', () => this.pause());
         // window.addEventListener('focus', () => this.resume());
 
-        /*
-        const scene = this.scene;
-
-        this.scene.init();
-
         this.emit('boot');
-
-        this.scene.preload();
-
-        if (this.loader.totalFilesToLoad() > 0)
-        {
-            this.loader.start(() => this.start());
-        }
-        else
-        {
-            this.start();
-        }
-        */
-    }
-
-    start ()
-    {
-        // this.scene.create();
 
         requestAnimationFrame(() => this.step());
     }
@@ -137,12 +105,20 @@ export default class Game extends EventEmitter
     banner (version: string)
     {
         console.log(
-            '%c  %c  %cPhaser Nano v' + version + '%c https://phaser4.io',
+            '%c  %cPhaser Nano v' + version + '%c https://phaser4.io',
             'padding: 2px; background: linear-gradient(to right, #00bcc3, #3e0081)',
-            'padding: 2px; background: #3e0081 url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJ1BMVEUALon///+9tJQAAABv9v92d2IAn6qHEhL/DQ3/fCUOOlNMPUD/uz24pItZAAAAaElEQVQI12OAA/YCKKPyOANbWgKQUdFZkOLiBmJ0zHIRdAEKWXR0uQimABnWu3elpIEYhoKCYS4ui8EModBQRQMG09AgQSBQBmpvBzOABhYpAYEBg3FpEJAOZgCqAdEGDAzGIACk4QAAsv0aPCHrnowAAAAASUVORK5CYII=) no-repeat;',
             'padding: 2px 20px 2px 8px; color: #fff; background: linear-gradient(to right, #3e0081 90%, #3e0081 10%, #00bcc3)',
             ''
         );
+
+        //  Adds ~400 bytes to build size :(
+        // console.log(
+        //     '%c  %c  %cPhaser Nano v' + version + '%c https://phaser4.io',
+        //     'padding: 2px; background: linear-gradient(to right, #00bcc3, #3e0081)',
+        //     'padding: 2px; background: #3e0081 url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJ1BMVEUALon///+9tJQAAABv9v92d2IAn6qHEhL/DQ3/fCUOOlNMPUD/uz24pItZAAAAaElEQVQI12OAA/YCKKPyOANbWgKQUdFZkOLiBmJ0zHIRdAEKWXR0uQimABnWu3elpIEYhoKCYS4ui8EModBQRQMG09AgQSBQBmpvBzOABhYpAYEBg3FpEJAOZgCqAdEGDAzGIACk4QAAsv0aPCHrnowAAAAASUVORK5CYII=) no-repeat;',
+        //     'padding: 2px 20px 2px 8px; color: #fff; background: linear-gradient(to right, #3e0081 90%, #3e0081 10%, #00bcc3)',
+        //     ''
+        // );
     }
 
     step ()
@@ -158,25 +134,18 @@ export default class Game extends EventEmitter
     
         this.emit('step', dt, now);
 
+        const sceneManager = this.scenes;
+
         if (!this.isPaused)
         {
-            this.scenes.update(dt, now);
+            sceneManager.update(dt, now);
         }
 
         this.emit('update', dt, now);
 
-        //  These should probably be moved to the Scene Manager
-        //  so each Scene is classed as being dirty or not?
-        this.dirtyFrame = 0;
-        this.totalFrame = 0;
+        const totalDirty: number = sceneManager.render(this.frame);
 
-        //  Each Scene calls 'render' on the Renderer, that way we could cache
-        //  the Scene display, if it was paused or something
-        this.scenes.render();
-
-        // const renderList: IRenderable[] = this.scene.world.preRender();
-
-        // this.renderer.render(renderList, this.scene.camera, this.dirtyFrame);
+        this.renderer.render(sceneManager.renderList, totalDirty);
 
         this.emit('render', dt, now);
 
