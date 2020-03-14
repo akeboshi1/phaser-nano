@@ -403,7 +403,7 @@ void main (void)
             }
             return glTexture;
         }
-        render(list, camera, dirtyFrame) {
+        render(sceneList, dirtyFrame) {
             if (this.contextLost) {
                 return;
             }
@@ -424,724 +424,47 @@ void main (void)
                 gl.clearColor(cls[0], cls[1], cls[2], cls[3]);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
-            shader.bind(camera);
-            //  Process the render list
             const maxTextures = this.maxTextures;
             const activeTextures = this.activeTextures;
             const startActiveTexture = this.startActiveTexture;
-            for (let i = 0; i < list.length; i++) {
-                let entity = list[i];
-                let texture = entity.texture;
-                if (texture.glIndexCounter < startActiveTexture) {
-                    texture.glIndexCounter = startActiveTexture;
-                    if (this.currentActiveTexture < maxTextures) {
-                        //  Make this texture active
-                        activeTextures[this.currentActiveTexture] = texture;
-                        texture.glIndex = this.currentActiveTexture;
-                        gl.activeTexture(gl.TEXTURE0 + this.currentActiveTexture);
-                        gl.bindTexture(gl.TEXTURE_2D, texture.glTexture);
-                        this.currentActiveTexture++;
+            for (let c = 0; c < sceneList.length; c += 2) {
+                let camera = sceneList[c];
+                let list = sceneList[c + 1];
+                //  TODO - This only needs binding if
+                //  the camera matrix is different to before
+                shader.bind(camera);
+                //  Process the render list
+                for (let i = 0; i < list.length; i++) {
+                    let entity = list[i];
+                    let texture = entity.texture;
+                    if (texture.glIndexCounter < startActiveTexture) {
+                        texture.glIndexCounter = startActiveTexture;
+                        if (this.currentActiveTexture < maxTextures) {
+                            //  Make this texture active
+                            activeTextures[this.currentActiveTexture] = texture;
+                            texture.glIndex = this.currentActiveTexture;
+                            gl.activeTexture(gl.TEXTURE0 + this.currentActiveTexture);
+                            gl.bindTexture(gl.TEXTURE_2D, texture.glTexture);
+                            this.currentActiveTexture++;
+                        }
                     }
-                }
-                /*
-                if (entity.type === 'SpriteBuffer')
-                {
-                    if (shader.batchSpriteBuffer(entity as SpriteBuffer))
+                    /*
+                    if (entity.type === 'SpriteBuffer')
                     {
-                        //  Reset active textures
-                        this.currentActiveTexture = 0;
-                        this.startActiveTexture++;
+                        if (shader.batchSpriteBuffer(entity as SpriteBuffer))
+                        {
+                            //  Reset active textures
+                            this.currentActiveTexture = 0;
+                            this.startActiveTexture++;
+                        }
                     }
+                    */
+                    shader.batchSprite(entity);
                 }
-                */
-                shader.batchSprite(entity);
+                //  This only needs flushing if the next
+                //  Scene has a different camera matrix
+                shader.flush();
             }
-            shader.flush();
-        }
-    }
-
-    class File {
-        constructor(type, key, url, loadHandler, config) {
-            this.hasLoaded = false;
-            this.type = type;
-            this.key = key;
-            this.url = url;
-            this.loadHandler = loadHandler;
-            this.config = config;
-        }
-    }
-
-    class Loader {
-        constructor(game) {
-            this.baseURL = '';
-            this.path = '';
-            this.crossOrigin = undefined;
-            this.maxParallelDownloads = 32;
-            this.isLoading = false;
-            this.game = game;
-            this.reset();
-        }
-        reset() {
-            this.isLoading = false;
-            this.queue = [];
-            this.inflight = new Map();
-        }
-        start(onComplete) {
-            if (this.isLoading) {
-                return;
-            }
-            // console.log('Loader.start', this.totalFilesToLoad());
-            if (this.queue.length > 0) {
-                this.isLoading = true;
-                this.onComplete = onComplete;
-                this.nextFile();
-            }
-            else {
-                onComplete();
-            }
-        }
-        nextFile() {
-            // let total: number = this.inflight.size;
-            let total = this.queue.length;
-            if (total) {
-                //  One at a time ...
-                let file = this.queue.shift();
-                this.inflight.set(file.url, file);
-                // console.log('Loader.nextFile', file.key, file.url);
-                file.loadHandler(file);
-            }
-            else if (this.inflight.size === 0) {
-                this.stop();
-            }
-        }
-        stop() {
-            this.isLoading = false;
-            this.onComplete();
-        }
-        fileComplete(file) {
-            //  Link file?
-            if (file.linkFile && file.linkFile.hasLoaded) {
-                const imageFile = (file.type === 'atlasimage') ? file : file.linkFile;
-                const jsonFile = (file.type === 'atlasjson') ? file : file.linkFile;
-                this.game.textures.addAtlas(file.key, imageFile.data, jsonFile.data);
-            }
-            this.inflight.delete(file.url);
-            this.nextFile();
-        }
-        fileError(file) {
-            this.inflight.delete(file.url);
-            this.nextFile();
-        }
-        totalFilesToLoad() {
-            return this.queue.length + this.inflight.size;
-        }
-        image(key, url) {
-            let file = new File('image', key, this.getURL(key, url, '.png'), (file) => this.imageTagLoader(file));
-            this.queue.push(file);
-            return this;
-        }
-        spritesheet(key, url, frameConfig) {
-            let file = new File('spritesheet', key, this.getURL(key, url, '.png'), (file) => this.imageTagLoader(file));
-            file.config = frameConfig;
-            this.queue.push(file);
-            return this;
-        }
-        atlas(key, textureURL, atlasURL) {
-            let textureFile = new File('atlasimage', key, this.getURL(key, textureURL, '.png'), (file) => this.imageTagLoader(file));
-            let JSONFile = new File('atlasjson', key, this.getURL(key, atlasURL, '.json'), (file) => this.XHRLoader(file));
-            JSONFile.config = { responseType: 'text' };
-            textureFile.linkFile = JSONFile;
-            JSONFile.linkFile = textureFile;
-            this.queue.push(textureFile);
-            this.queue.push(JSONFile);
-            return this;
-        }
-        json(key, url) {
-            let file = new File('json', key, this.getURL(key, url, '.json'), (file) => this.XHRLoader(file));
-            file.config = { responseType: 'text' };
-            this.queue.push(file);
-            return this;
-        }
-        csv(key, url) {
-            let file = new File('csv', key, this.getURL(key, url, '.csv'), (file) => this.XHRLoader(file));
-            file.config = { responseType: 'text' };
-            this.queue.push(file);
-            return this;
-        }
-        XHRLoader(file) {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', file.url, true);
-            xhr.responseType = file.config['responseType'];
-            xhr.onload = (event) => {
-                file.hasLoaded = true;
-                if (file.type === 'json' || file.type === 'atlasjson') {
-                    file.data = JSON.parse(xhr.responseText);
-                }
-                else {
-                    file.data = xhr.responseText;
-                }
-                this.fileComplete(file);
-            };
-            xhr.onerror = () => {
-                file.hasLoaded = true;
-                this.fileError(file);
-            };
-            xhr.send();
-        }
-        imageTagLoader(file) {
-            // console.log('Loader.imageTagLoader', file.key);
-            // console.log(this);
-            file.data = new Image();
-            if (this.crossOrigin) {
-                file.data.crossOrigin = this.crossOrigin;
-            }
-            file.data.onload = () => {
-                // console.log('File.data.onload', file.key);
-                file.data.onload = null;
-                file.data.onerror = null;
-                file.hasLoaded = true;
-                if (file.type === 'image') {
-                    this.game.textures.addImage(file.key, file.data);
-                }
-                else if (file.type === 'spritesheet') {
-                    this.game.textures.addSpriteSheet(file.key, file.data, file.config);
-                }
-                this.fileComplete(file);
-            };
-            file.data.onerror = () => {
-                // console.log('File.data.onerror', file.key);
-                file.data.onload = null;
-                file.data.onerror = null;
-                file.hasLoaded = true;
-                this.fileError(file);
-            };
-            file.data.src = file.url;
-            //  Image is cached / available immediately
-            if (file.data.complete && file.data.width && file.data.height) {
-                file.data.onload = null;
-                file.data.onerror = null;
-                file.hasLoaded = true;
-                if (file.type === 'image') {
-                    this.game.textures.addImage(file.key, file.data);
-                }
-                else if (file.type === 'spritesheet') {
-                    this.game.textures.addSpriteSheet(file.key, file.data, file.config);
-                }
-                this.fileComplete(file);
-            }
-        }
-        getURL(key, url, extension) {
-            if (!url) {
-                url = key + extension;
-            }
-            if (url.match(/^(?:blob:|data:|http:\/\/|https:\/\/|\/\/)/)) {
-                return url;
-            }
-            else {
-                return this.baseURL + this.path + url;
-            }
-        }
-        setBaseURL(url) {
-            if (url !== '' && url.substr(-1) !== '/') {
-                url = url.concat('/');
-            }
-            this.baseURL = url;
-            return this;
-        }
-        setPath(path) {
-            if (path !== '' && path.substr(-1) !== '/') {
-                path = path.concat('/');
-            }
-            this.path = path;
-            return this;
-        }
-        setCORS(crossOrigin) {
-            this.crossOrigin = crossOrigin;
-            return this;
-        }
-    }
-
-    class Frame {
-        constructor(texture, key, x, y, width, height) {
-            this.trimmed = false;
-            this.texture = texture;
-            this.key = key;
-            this.x = x;
-            this.y = y;
-            this.width = width;
-            this.height = height;
-            this.sourceSizeWidth = width;
-            this.sourceSizeHeight = height;
-            this.updateUVs();
-        }
-        setPivot(x, y) {
-            this.pivot = { x, y };
-        }
-        setSourceSize(width, height) {
-            this.sourceSizeWidth = width;
-            this.sourceSizeHeight = height;
-        }
-        setTrim(width, height, x, y, w, h) {
-            this.trimmed = true;
-            this.sourceSizeWidth = width;
-            this.sourceSizeHeight = height;
-            this.spriteSourceSizeX = x;
-            this.spriteSourceSizeY = y;
-            this.spriteSourceSizeWidth = w;
-            this.spriteSourceSizeHeight = h;
-        }
-        updateUVs() {
-            const { x, y, width, height } = this;
-            const baseTextureWidth = this.texture.width;
-            const baseTextureHeight = this.texture.height;
-            this.u0 = x / baseTextureWidth;
-            this.v0 = y / baseTextureHeight;
-            this.u1 = (x + width) / baseTextureWidth;
-            this.v1 = (y + height) / baseTextureHeight;
-        }
-    }
-
-    class Texture {
-        constructor(key, image) {
-            this.glIndex = 0;
-            this.glIndexCounter = -1;
-            this.key = key;
-            this.image = image;
-            this.width = image.width;
-            this.height = image.height;
-            this.frames = new Map();
-            this.add('__BASE', 0, 0, image.width, image.height);
-        }
-        add(key, x, y, width, height) {
-            if (this.frames.has(key)) {
-                return null;
-            }
-            let frame = new Frame(this, key, x, y, width, height);
-            this.frames.set(key, frame);
-            if (!this.firstFrame || this.firstFrame.key === '__BASE') {
-                this.firstFrame = frame;
-            }
-            return frame;
-        }
-        get(key) {
-            //  null, undefined, empty string, zero
-            if (!key) {
-                return this.firstFrame;
-            }
-            if (key instanceof Frame) {
-                key = key.key;
-            }
-            let frame = this.frames.get(key);
-            if (!frame) {
-                console.warn('Texture.frame missing: ' + key);
-                frame = this.firstFrame;
-            }
-            return frame;
-        }
-        getFrames(frames) {
-            const output = [];
-            frames.forEach((key) => {
-                output.push(this.get(key));
-            });
-            return output;
-        }
-        getFramesInRange(prefix, start, end, zeroPad = 0, suffix = '') {
-            const frameKeys = [];
-            const diff = (start < end) ? 1 : -1;
-            //  Adjust because we use i !== end in the for loop
-            end += diff;
-            for (let i = start; i !== end; i += diff) {
-                frameKeys.push(prefix + i.toString().padStart(zeroPad, '0') + suffix);
-            }
-            return this.getFrames(frameKeys);
-        }
-    }
-
-    function SpriteSheetParser (texture, x, y, width, height, frameConfig) {
-        let { frameWidth = null, frameHeight = null, startFrame = 0, endFrame = -1, margin = 0, spacing = 0 } = frameConfig;
-        if (!frameHeight) {
-            frameHeight = frameWidth;
-        }
-        //  If missing we can't proceed
-        if (frameWidth === null) {
-            throw new Error('TextureManager.SpriteSheet: Invalid frameWidth given.');
-        }
-        const row = Math.floor((width - margin + spacing) / (frameWidth + spacing));
-        const column = Math.floor((height - margin + spacing) / (frameHeight + spacing));
-        let total = row * column;
-        if (total === 0) {
-            console.warn('SpriteSheet frame dimensions will result in zero frames.');
-        }
-        if (startFrame > total || startFrame < -total) {
-            startFrame = 0;
-        }
-        if (startFrame < 0) {
-            //  Allow negative skipframes.
-            startFrame = total + startFrame;
-        }
-        if (endFrame !== -1) {
-            total = startFrame + (endFrame + 1);
-        }
-        let fx = margin;
-        let fy = margin;
-        let ax = 0;
-        let ay = 0;
-        for (let i = 0; i < total; i++) {
-            ax = 0;
-            ay = 0;
-            let w = fx + frameWidth;
-            let h = fy + frameHeight;
-            if (w > width) {
-                ax = w - width;
-            }
-            if (h > height) {
-                ay = h - height;
-            }
-            texture.add(i, x + fx, y + fy, frameWidth - ax, frameHeight - ay);
-            fx += frameWidth + spacing;
-            if (fx + frameWidth > width) {
-                fx = margin;
-                fy += frameHeight + spacing;
-            }
-        }
-    }
-
-    function AtlasParser (texture, data) {
-        let frames;
-        if (Array.isArray(data.textures)) {
-            //  TP3 Format
-            frames = data.textures[0].frames;
-        }
-        else if (Array.isArray(data.frames)) {
-            //  TP2 Format Array
-            frames = data.frames;
-        }
-        else if (data.hasOwnProperty('frames')) {
-            //  TP2 Format Hash
-            frames = Object.values(data.frames);
-        }
-        else {
-            console.warn('Invalid Texture Atlas JSON');
-        }
-        if (frames) {
-            let newFrame;
-            for (let i = 0; i < frames.length; i++) {
-                let src = frames[i];
-                //  The frame values are the exact coordinates to cut the frame out of the atlas from
-                newFrame = texture.add(src.filename, src.frame.x, src.frame.y, src.frame.w, src.frame.h);
-                //  These are the original (non-trimmed) sprite values
-                if (src.trimmed) {
-                    newFrame.setTrim(src.sourceSize.w, src.sourceSize.h, src.spriteSourceSize.x, src.spriteSourceSize.y, src.spriteSourceSize.w, src.spriteSourceSize.h);
-                }
-                else {
-                    newFrame.setSourceSize(src.sourceSize.w, src.sourceSize.h);
-                }
-                if (src.rotated) ;
-                if (src.anchor) {
-                    newFrame.setPivot(src.anchor.x, src.anchor.y);
-                }
-            }
-        }
-    }
-
-    class TextureManager {
-        constructor(game) {
-            this.game = game;
-            this.textures = new Map();
-        }
-        get(key) {
-            if (this.textures.has(key)) {
-                return this.textures.get(key);
-            }
-            else {
-                return this.textures.get('__MISSING');
-            }
-        }
-        addImage(key, source) {
-            let texture = null;
-            if (!this.textures.has(key)) {
-                texture = new Texture(key, source);
-                texture.glTexture = this.game.renderer.createGLTexture(texture.image);
-                this.textures.set(key, texture);
-            }
-            return texture;
-        }
-        addSpriteSheet(key, source, frameConfig) {
-            let texture = null;
-            if (!this.textures.has(key)) {
-                texture = new Texture(key, source);
-                texture.glTexture = this.game.renderer.createGLTexture(texture.image);
-                SpriteSheetParser(texture, 0, 0, texture.width, texture.height, frameConfig);
-                this.textures.set(key, texture);
-            }
-            return texture;
-        }
-        addAtlas(key, source, atlasData) {
-            let texture = null;
-            if (!this.textures.has(key)) {
-                texture = new Texture(key, source);
-                texture.glTexture = this.game.renderer.createGLTexture(texture.image);
-                AtlasParser(texture, atlasData);
-                this.textures.set(key, texture);
-            }
-            return texture;
-        }
-        addColor(key, color, width = 32, height = 32) {
-            return this.addGrid(key, color, color, width, height, 0, 0);
-        }
-        addGrid(key, color1, color2, width = 32, height = 32, cols = 2, rows = 2) {
-            let texture = null;
-            if (!this.textures.has(key)) {
-                const ctx = this.createCanvas(width, height);
-                const colWidth = width / cols;
-                const rowHeight = height / rows;
-                ctx.fillStyle = color1;
-                ctx.fillRect(0, 0, width, height);
-                ctx.fillStyle = color2;
-                for (let y = 0; y < rows; y++) {
-                    for (let x = (y % 2); x < cols; x += 2) {
-                        ctx.fillRect(x * colWidth, y * rowHeight, colWidth, rowHeight);
-                    }
-                }
-                texture = new Texture(key, ctx.canvas);
-                texture.glTexture = this.game.renderer.createGLTexture(texture.image);
-                this.textures.set(key, texture);
-            }
-            return texture;
-        }
-        createCanvas(width, height) {
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            return canvas.getContext('2d');
-        }
-    }
-
-    class EE {
-        constructor(callback, context, once = false) {
-            this.callback = callback;
-            this.context = context;
-            this.once = once;
-        }
-    }
-    class EventEmitter {
-        constructor() {
-            this._events = new Map();
-        }
-        on(event, callback, context = this, once = false) {
-            if (typeof callback !== 'function') {
-                throw new TypeError('The listener must be a function');
-            }
-            const listener = new EE(callback, context, once);
-            const listeners = this._events.get(event);
-            if (!listeners) {
-                this._events.set(event, new Set([listener]));
-            }
-            else {
-                listeners.add(listener);
-            }
-            return this;
-        }
-        once(event, callback, context = this) {
-            return this.on(event, callback, context, true);
-        }
-        /**
-         * Clear an event by name.
-         */
-        clearEvent(event) {
-            this._events.delete(event);
-            return this;
-        }
-        /**
-         * Return an array listing the events for which the emitter has registered listeners.
-         */
-        eventNames() {
-            return [...this._events.keys()];
-        }
-        /**
-         * Return the listeners registered for a given event.
-         */
-        listeners(event) {
-            const out = [];
-            const listeners = this._events.get(event);
-            listeners.forEach((ee) => {
-                out.push(ee.callback);
-            });
-            return out;
-        }
-        /**
-         * Return the number of listeners listening to a given event.
-         */
-        listenerCount(event) {
-            const listeners = this._events.get(event);
-            return (listeners) ? listeners.size : 0;
-        }
-        /**
-         * Calls each of the listeners registered for a given event.
-         */
-        emit(event, ...args) {
-            if (!this._events.has(event)) {
-                return false;
-            }
-            const listeners = this._events.get(event);
-            for (const ee of listeners) {
-                ee.callback.apply(ee.context, args);
-                if (ee.once) {
-                    listeners.delete(ee);
-                }
-            }
-            if (listeners.size === 0) {
-                this._events.delete(event);
-            }
-            return true;
-        }
-        /**
-         * Remove the listeners of a given event.
-         *
-         * @param event
-         * @param callback
-         * @param context
-         * @param once
-         */
-        off(event, callback, context, once) {
-            if (!callback) {
-                //  Remove all events matching the given key
-                this._events.delete(event);
-            }
-            else {
-                const listeners = this._events.get(event);
-                const hasContext = !context;
-                const hasOnce = (once !== undefined);
-                for (const ee of listeners) {
-                    if (ee.callback === callback && (hasContext && ee.context === console) && (hasOnce && ee.once === once)) {
-                        listeners.delete(ee);
-                    }
-                }
-                if (listeners.size === 0) {
-                    this._events.delete(event);
-                }
-            }
-            return this;
-        }
-        /**
-         * Remove all listeners, or those of the specified event.
-         *
-         * @param event
-         */
-        removeAllListeners(event) {
-            if (!event) {
-                this._events.clear();
-            }
-            else {
-                this._events.delete(event);
-            }
-        }
-    }
-
-    class Game extends EventEmitter {
-        constructor(config) {
-            super();
-            this.VERSION = '4.0.0-beta1';
-            this.isPaused = false;
-            this.isBooted = false;
-            this.lifetime = 0;
-            this.elapsed = 0;
-            //  The current game frame
-            this.frame = 0;
-            //  How many Game Objects were made dirty this frame?
-            this.dirtyFrame = 0;
-            //  How many Game Objects were processed this frame?
-            this.totalFrame = 0;
-            const { width = 800, height = 600, backgroundColor = 0x00000, parent = document.body, scene = null } = config;
-            this.config = { width, height, backgroundColor, parent, scene };
-            DOMContentLoaded(() => this.boot());
-        }
-        pause() {
-            this.isPaused = true;
-            this.emit('pause');
-        }
-        resume() {
-            this.isPaused = false;
-            this.lastTick = Date.now();
-            this.emit('resume');
-        }
-        boot() {
-            this.isBooted = true;
-            this.lastTick = Date.now();
-            this.textures = new TextureManager(this);
-            this.loader = new Loader(this);
-            const config = this.config;
-            const renderer = new WebGLRenderer(config.width, config.height);
-            renderer.setBackgroundColor(config.backgroundColor);
-            AddToDOM(renderer.canvas, config.parent);
-            this.renderer = renderer;
-            this.banner(this.VERSION);
-            //  Visibility API
-            document.addEventListener('visibilitychange', () => {
-                this.emit('visibilitychange', document.hidden);
-                if (document.hidden) {
-                    this.pause();
-                }
-                else {
-                    this.resume();
-                }
-            });
-            // window.addEventListener('blur', () => this.pause());
-            // window.addEventListener('focus', () => this.resume());
-            /*
-            const scene = this.scene;
-
-            this.scene.init();
-
-            this.emit('boot');
-
-            this.scene.preload();
-
-            if (this.loader.totalFilesToLoad() > 0)
-            {
-                this.loader.start(() => this.start());
-            }
-            else
-            {
-                this.start();
-            }
-            */
-        }
-        start() {
-            // this.scene.create();
-            requestAnimationFrame(() => this.step());
-        }
-        banner(version) {
-            console.log('%c  %c  %cPhaser Nano v' + version + '%c https://phaser4.io', 'padding: 2px; background: linear-gradient(to right, #00bcc3, #3e0081)', 'padding: 2px; background: #3e0081 url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJ1BMVEUALon///+9tJQAAABv9v92d2IAn6qHEhL/DQ3/fCUOOlNMPUD/uz24pItZAAAAaElEQVQI12OAA/YCKKPyOANbWgKQUdFZkOLiBmJ0zHIRdAEKWXR0uQimABnWu3elpIEYhoKCYS4ui8EModBQRQMG09AgQSBQBmpvBzOABhYpAYEBg3FpEJAOZgCqAdEGDAzGIACk4QAAsv0aPCHrnowAAAAASUVORK5CYII=) no-repeat;', 'padding: 2px 20px 2px 8px; color: #fff; background: linear-gradient(to right, #3e0081 90%, #3e0081 10%, #00bcc3)', '');
-        }
-        step() {
-            const now = Date.now();
-            const delta = now - this.lastTick;
-            const dt = delta / 1000;
-            this.lifetime += dt;
-            this.elapsed = dt;
-            this.lastTick = now;
-            this.emit('step', dt, now);
-            if (!this.isPaused) {
-                this.scenes.update(dt, now);
-            }
-            this.emit('update', dt, now);
-            //  These should probably be moved to the Scene Manager
-            //  so each Scene is classed as being dirty or not?
-            this.dirtyFrame = 0;
-            this.totalFrame = 0;
-            //  Each Scene calls 'render' on the Renderer, that way we could cache
-            //  the Scene display, if it was paused or something
-            this.scenes.render();
-            // const renderList: IRenderable[] = this.scene.world.preRender();
-            // this.renderer.render(renderList, this.scene.camera, this.dirtyFrame);
-            this.emit('render', dt, now);
-            //  The frame always advances by 1 each step (even when paused)
-            this.frame++;
-            requestAnimationFrame(() => this.step());
-        }
-        destroy() {
-            //  TODO
         }
     }
 
@@ -1607,6 +930,102 @@ void main (void)
         };
     }
 
+    class Frame {
+        constructor(texture, key, x, y, width, height) {
+            this.trimmed = false;
+            this.texture = texture;
+            this.key = key;
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.sourceSizeWidth = width;
+            this.sourceSizeHeight = height;
+            this.updateUVs();
+        }
+        setPivot(x, y) {
+            this.pivot = { x, y };
+        }
+        setSourceSize(width, height) {
+            this.sourceSizeWidth = width;
+            this.sourceSizeHeight = height;
+        }
+        setTrim(width, height, x, y, w, h) {
+            this.trimmed = true;
+            this.sourceSizeWidth = width;
+            this.sourceSizeHeight = height;
+            this.spriteSourceSizeX = x;
+            this.spriteSourceSizeY = y;
+            this.spriteSourceSizeWidth = w;
+            this.spriteSourceSizeHeight = h;
+        }
+        updateUVs() {
+            const { x, y, width, height } = this;
+            const baseTextureWidth = this.texture.width;
+            const baseTextureHeight = this.texture.height;
+            this.u0 = x / baseTextureWidth;
+            this.v0 = y / baseTextureHeight;
+            this.u1 = (x + width) / baseTextureWidth;
+            this.v1 = (y + height) / baseTextureHeight;
+        }
+    }
+
+    class Texture {
+        constructor(key, image) {
+            this.glIndex = 0;
+            this.glIndexCounter = -1;
+            this.key = key;
+            this.image = image;
+            this.width = image.width;
+            this.height = image.height;
+            this.frames = new Map();
+            this.add('__BASE', 0, 0, image.width, image.height);
+        }
+        add(key, x, y, width, height) {
+            if (this.frames.has(key)) {
+                return null;
+            }
+            let frame = new Frame(this, key, x, y, width, height);
+            this.frames.set(key, frame);
+            if (!this.firstFrame || this.firstFrame.key === '__BASE') {
+                this.firstFrame = frame;
+            }
+            return frame;
+        }
+        get(key) {
+            //  null, undefined, empty string, zero
+            if (!key) {
+                return this.firstFrame;
+            }
+            if (key instanceof Frame) {
+                key = key.key;
+            }
+            let frame = this.frames.get(key);
+            if (!frame) {
+                console.warn('Texture.frame missing: ' + key);
+                frame = this.firstFrame;
+            }
+            return frame;
+        }
+        getFrames(frames) {
+            const output = [];
+            frames.forEach((key) => {
+                output.push(this.get(key));
+            });
+            return output;
+        }
+        getFramesInRange(prefix, start, end, zeroPad = 0, suffix = '') {
+            const frameKeys = [];
+            const diff = (start < end) ? 1 : -1;
+            //  Adjust because we use i !== end in the for loop
+            end += diff;
+            for (let i = start; i !== end; i += diff) {
+                frameKeys.push(prefix + i.toString().padStart(zeroPad, '0') + suffix);
+            }
+            return this.getFrames(frameKeys);
+        }
+    }
+
     function TextureComponent(Base) {
         return class TextureComponent extends Base {
             constructor() {
@@ -1619,7 +1038,7 @@ void main (void)
                     this.texture = key;
                 }
                 else {
-                    this.texture = this.scene.textures.get(key);
+                    this.texture = this.scene.game.textures.get(key);
                 }
                 if (!this.texture) {
                     console.warn('Invalid Texture key: ' + key);
@@ -1756,6 +1175,31 @@ void main (void)
             this.scene = scene;
             this._position.set(x, y);
             this.dirty = true;
+            this.name = '';
+        }
+    }
+
+    class Container extends Install(GameObject, [
+        ContainerComponent
+    ]) {
+        constructor(scene, x = 0, y = 0) {
+            super();
+            this.setScene(scene);
+            this.setPosition(x, y);
+        }
+        update(dt, now) {
+            const children = this.children;
+            for (let i = 0; i < children.length; i++) {
+                children[i].update(dt, now);
+            }
+        }
+        updateTransform() {
+            super.updateTransform();
+            const children = this.children;
+            for (let i = 0; i < children.length; i++) {
+                children[i].updateTransform();
+            }
+            return this;
         }
     }
 
@@ -1798,92 +1242,365 @@ void main (void)
         }
     }
 
-    class Container extends Install(GameObject, [
-        ContainerComponent
-    ]) {
-        constructor(scene, x = 0, y = 0) {
-            super();
-            this.setScene(scene);
-            this.setPosition(x, y);
-        }
-        update(dt, now) {
-            const children = this.children;
-            for (let i = 0; i < children.length; i++) {
-                children[i].update(dt, now);
-            }
-        }
-        preRender(dt, now) {
-            const game = this.scene.game;
-            game.totalFrame++;
-            if (this.dirtyFrame >= game.frame) {
-                game.dirtyFrame++;
-            }
-            const children = this.children;
-            for (let i = 0; i < children.length; i++) {
-                // children[i].preRender(dt, now);
-            }
-        }
-        updateTransform() {
-            super.updateTransform();
-            const children = this.children;
-            for (let i = 0; i < children.length; i++) {
-                children[i].updateTransform();
-            }
-            return this;
-        }
-    }
-
     class World extends Container {
-        constructor(scene) {
+        constructor(scene, key) {
             super(scene);
+            //  How many Game Objects were made dirty this frame?
+            this.dirtyFrame = 0;
+            //  How many Game Objects were processed this frame?
+            this.totalFrame = 0;
+            this.name = key;
             this.renderList = [];
+            this.camera = new Camera(scene, 0, 0);
         }
-        scanChildren(root) {
+        scanChildren(root, gameFrame) {
             const children = root.getChildren();
             for (let i = 0; i < children.length; i++) {
-                this.buildRenderList(children[i]);
+                this.buildRenderList(children[i], gameFrame);
             }
         }
-        buildRenderList(root) {
-            const game = this.scene.game;
+        buildRenderList(root, gameFrame) {
             if (root.willRender()) {
                 this.renderList.push(root);
-                if (root.dirtyFrame >= game.frame) {
-                    game.dirtyFrame++;
+                if (root.dirtyFrame >= gameFrame) {
+                    this.dirtyFrame++;
                 }
             }
             if (root.isParent) {
-                this.scanChildren(root);
+                this.scanChildren(root, gameFrame);
             }
-        }
-        preRender() {
-            this.renderList = [];
-            this.scanChildren(this);
-            return this.renderList;
         }
         update(dt, now) {
             const children = this.children;
             for (let i = 0; i < children.length; i++) {
                 children[i].update(dt, now);
             }
+        }
+        render(gameFrame) {
+            this.dirtyFrame = 0;
+            this.renderList.length = 0;
+            this.scanChildren(this, gameFrame);
+            this.totalFrame = this.renderList.length;
+            return this.dirtyFrame;
         }
     }
 
     class Scene {
+        constructor(game, key = 'default') {
+            this.game = game;
+            this.world = new World(this, key);
+        }
+    }
+
+    class SceneManager {
+        constructor(game, sceneConfig) {
+            //  How many Game Objects were made dirty this frame across all Scenes?
+            this.dirtyFrame = 0;
+            //  How many Game Objects were processed this frame across all Scenes?
+            this.totalFrame = 0;
+            this.game = game;
+            this.scenes = new Map();
+            this.renderList = [];
+            sceneConfig = [].concat(sceneConfig);
+            sceneConfig.forEach((scene) => {
+                this.addScene(scene);
+            });
+        }
+        update(delta, now) {
+            this.scenes.forEach(scene => {
+                // scene.update(dt, now);
+                scene.world.update(delta, now);
+            });
+        }
+        render(gameFrame) {
+            const renderList = this.renderList;
+            renderList.length = 0;
+            this.dirtyFrame = 0;
+            this.totalFrame = 0;
+            this.scenes.forEach(scene => {
+                let world = scene.world;
+                this.dirtyFrame += world.render(gameFrame);
+                this.totalFrame += world.totalFrame;
+                renderList.push(world.camera);
+                renderList.push(world.renderList);
+            });
+            return this.dirtyFrame;
+        }
+        addScene(sceneConfig) {
+            let scene;
+            if (sceneConfig instanceof Scene) {
+                scene = this.createSceneFromInstance(sceneConfig);
+            }
+            else if (typeof sceneConfig === 'object') {
+                scene = this.createSceneFromObject(sceneConfig);
+            }
+            else if (typeof sceneConfig === 'function') {
+                scene = this.createSceneFromFunction(sceneConfig);
+            }
+            console.log('Scene.addScene', scene.world.name);
+            this.scenes.set(scene.world.name, scene);
+        }
+        createSceneFromInstance(newScene) {
+            newScene.game = this.game;
+            return newScene;
+        }
+        createSceneFromObject(scene) {
+            let newScene = new Scene(this.game);
+            //  Extract callbacks
+            const defaults = ['init', 'preload', 'create', 'update', 'render'];
+            defaults.forEach((method) => {
+                if (scene.hasOwnProperty(method)) {
+                    newScene[method] = scene[method];
+                }
+            });
+            return newScene;
+        }
+        createSceneFromFunction(scene) {
+            var newScene = new scene(this.game);
+            if (newScene instanceof Scene) {
+                return this.createSceneFromInstance(newScene);
+            }
+            else {
+                return newScene;
+            }
+        }
+    }
+
+    // import AtlasParser from './AtlasParser';
+    class TextureManager {
         constructor(game) {
             this.game = game;
-            this.load = game.loader;
-            this.textures = game.textures;
-            this.world = new World(this);
-            this.camera = new Camera(this, 0, 0);
+            this.textures = new Map();
         }
-        init() {
+        get(key) {
+            if (this.textures.has(key)) {
+                return this.textures.get(key);
+            }
+            else {
+                return this.textures.get('__MISSING');
+            }
         }
-        preload() {
+        add(key, source) {
+            let texture;
+            if (!this.textures.has(key)) {
+                if (source instanceof Texture) {
+                    texture = source;
+                    texture.key = key;
+                }
+                else {
+                    texture = new Texture(key, source);
+                }
+                // TODO: Make this happen at render time
+                texture.glTexture = this.game.renderer.createGLTexture(texture.image);
+                this.textures.set(key, texture);
+            }
+            return texture;
         }
-        create() {
+    }
+
+    class EE {
+        constructor(callback, context, once = false) {
+            this.callback = callback;
+            this.context = context;
+            this.once = once;
         }
-        update(delta, time) {
+    }
+    class EventEmitter {
+        constructor() {
+            this._events = new Map();
+        }
+        on(event, callback, context = this, once = false) {
+            if (typeof callback !== 'function') {
+                throw new TypeError('The listener must be a function');
+            }
+            const listener = new EE(callback, context, once);
+            const listeners = this._events.get(event);
+            if (!listeners) {
+                this._events.set(event, new Set([listener]));
+            }
+            else {
+                listeners.add(listener);
+            }
+            return this;
+        }
+        once(event, callback, context = this) {
+            return this.on(event, callback, context, true);
+        }
+        /**
+         * Clear an event by name.
+         */
+        clearEvent(event) {
+            this._events.delete(event);
+            return this;
+        }
+        /**
+         * Return an array listing the events for which the emitter has registered listeners.
+         */
+        eventNames() {
+            return [...this._events.keys()];
+        }
+        /**
+         * Return the listeners registered for a given event.
+         */
+        listeners(event) {
+            const out = [];
+            const listeners = this._events.get(event);
+            listeners.forEach((ee) => {
+                out.push(ee.callback);
+            });
+            return out;
+        }
+        /**
+         * Return the number of listeners listening to a given event.
+         */
+        listenerCount(event) {
+            const listeners = this._events.get(event);
+            return (listeners) ? listeners.size : 0;
+        }
+        /**
+         * Calls each of the listeners registered for a given event.
+         */
+        emit(event, ...args) {
+            if (!this._events.has(event)) {
+                return false;
+            }
+            const listeners = this._events.get(event);
+            for (const ee of listeners) {
+                ee.callback.apply(ee.context, args);
+                if (ee.once) {
+                    listeners.delete(ee);
+                }
+            }
+            if (listeners.size === 0) {
+                this._events.delete(event);
+            }
+            return true;
+        }
+        /**
+         * Remove the listeners of a given event.
+         *
+         * @param event
+         * @param callback
+         * @param context
+         * @param once
+         */
+        off(event, callback, context, once) {
+            if (!callback) {
+                //  Remove all events matching the given key
+                this._events.delete(event);
+            }
+            else {
+                const listeners = this._events.get(event);
+                const hasContext = !context;
+                const hasOnce = (once !== undefined);
+                for (const ee of listeners) {
+                    if (ee.callback === callback && (hasContext && ee.context === console) && (hasOnce && ee.once === once)) {
+                        listeners.delete(ee);
+                    }
+                }
+                if (listeners.size === 0) {
+                    this._events.delete(event);
+                }
+            }
+            return this;
+        }
+        /**
+         * Remove all listeners, or those of the specified event.
+         *
+         * @param event
+         */
+        removeAllListeners(event) {
+            if (!event) {
+                this._events.clear();
+            }
+            else {
+                this._events.delete(event);
+            }
+        }
+    }
+
+    class Game extends EventEmitter {
+        constructor(config) {
+            super();
+            this.VERSION = '4.0.0-beta1';
+            this.isPaused = false;
+            this.isBooted = false;
+            this.lifetime = 0;
+            this.elapsed = 0;
+            //  The current game frame
+            this.frame = 0;
+            const { width = 800, height = 600, backgroundColor = 0x00000, parent = document.body, scene = null } = config;
+            this.config = { width, height, backgroundColor, parent, scene };
+            DOMContentLoaded(() => this.boot());
+        }
+        pause() {
+            this.isPaused = true;
+            this.emit('pause');
+        }
+        resume() {
+            this.isPaused = false;
+            this.lastTick = Date.now();
+            this.emit('resume');
+        }
+        boot() {
+            const config = this.config;
+            this.isBooted = true;
+            this.lastTick = Date.now();
+            const renderer = new WebGLRenderer(config.width, config.height);
+            renderer.setBackgroundColor(config.backgroundColor);
+            AddToDOM(renderer.canvas, config.parent);
+            this.renderer = renderer;
+            this.textures = new TextureManager(this);
+            this.scenes = new SceneManager(this, config.scene);
+            this.banner(this.VERSION);
+            //  Visibility API
+            document.addEventListener('visibilitychange', () => {
+                this.emit('visibilitychange', document.hidden);
+                if (document.hidden) {
+                    this.pause();
+                }
+                else {
+                    this.resume();
+                }
+            });
+            // window.addEventListener('blur', () => this.pause());
+            // window.addEventListener('focus', () => this.resume());
+            this.emit('boot');
+            requestAnimationFrame(() => this.step());
+        }
+        banner(version) {
+            console.log('%c  %cPhaser Nano v' + version + '%c https://phaser4.io', 'padding: 2px; background: linear-gradient(to right, #00bcc3, #3e0081)', 'padding: 2px 20px 2px 8px; color: #fff; background: linear-gradient(to right, #3e0081 90%, #3e0081 10%, #00bcc3)', '');
+            //  Adds ~400 bytes to build size :(
+            // console.log(
+            //     '%c  %c  %cPhaser Nano v' + version + '%c https://phaser4.io',
+            //     'padding: 2px; background: linear-gradient(to right, #00bcc3, #3e0081)',
+            //     'padding: 2px; background: #3e0081 url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJ1BMVEUALon///+9tJQAAABv9v92d2IAn6qHEhL/DQ3/fCUOOlNMPUD/uz24pItZAAAAaElEQVQI12OAA/YCKKPyOANbWgKQUdFZkOLiBmJ0zHIRdAEKWXR0uQimABnWu3elpIEYhoKCYS4ui8EModBQRQMG09AgQSBQBmpvBzOABhYpAYEBg3FpEJAOZgCqAdEGDAzGIACk4QAAsv0aPCHrnowAAAAASUVORK5CYII=) no-repeat;',
+            //     'padding: 2px 20px 2px 8px; color: #fff; background: linear-gradient(to right, #3e0081 90%, #3e0081 10%, #00bcc3)',
+            //     ''
+            // );
+        }
+        step() {
+            const now = Date.now();
+            const delta = now - this.lastTick;
+            const dt = delta / 1000;
+            this.lifetime += dt;
+            this.elapsed = dt;
+            this.lastTick = now;
+            this.emit('step', dt, now);
+            const sceneManager = this.scenes;
+            if (!this.isPaused) {
+                sceneManager.update(dt, now);
+            }
+            this.emit('update', dt, now);
+            const totalDirty = sceneManager.render(this.frame);
+            this.renderer.render(sceneManager.renderList, totalDirty);
+            this.emit('render', dt, now);
+            //  The frame always advances by 1 each step (even when paused)
+            this.frame++;
+            requestAnimationFrame(() => this.step());
+        }
+        destroy() {
+            //  TODO
         }
     }
 
@@ -2006,38 +1723,123 @@ void main (void)
         23 = topRight.packedColor
     */
 
-    // import LogoPNG from '../public/assets/logo.png';
+    class File {
+        // constructor (type: string, key: string, url: string, loadHandler: Function, config?: any)
+        constructor(key, url, config) {
+            this.crossOrigin = undefined;
+            this.hasLoaded = false;
+            // this.type = type;
+            this.key = key;
+            this.url = url;
+            // this.loadHandler = loadHandler;
+            this.config = config;
+        }
+    }
+
+    function ImageTagLoader(file) {
+        file.data = new Image();
+        if (file.crossOrigin) {
+            file.data.crossOrigin = file.crossOrigin;
+        }
+        return new Promise((resolve, reject) => {
+            file.data.onload = () => {
+                if (file.data.onload) {
+                    file.data.onload = null;
+                    file.data.onerror = null;
+                    resolve(file);
+                }
+            };
+            file.data.onerror = (event) => {
+                if (file.data.onload) {
+                    file.data.onload = null;
+                    file.data.onerror = null;
+                    file.error = event;
+                    reject(file);
+                }
+            };
+            file.data.src = file.url;
+            // Image is immediately-available or cached
+            if (file.data.complete && file.data.width && file.data.height) {
+                file.data.onload = null;
+                file.data.onerror = null;
+                resolve(file);
+            }
+        });
+    }
+
+    function GetURL(key, url, extension) {
+        if (!url) {
+            url = key + extension;
+        }
+        if (url.match(/^(?:blob:|data:|http:\/\/|https:\/\/|\/\/)/)) {
+            return url;
+        }
+        else {
+            // return this.baseURL + this.path + url;
+            return url;
+        }
+    }
+
+    function ImageFile(game, key, url) {
+        const file = new File(key, GetURL(key, url, '.png'));
+        return new Promise((resolve, reject) => {
+            ImageTagLoader(file).then(file => {
+                resolve(game.textures.add(key, file.data));
+            }).catch(file => {
+                reject(null);
+            });
+        });
+    }
+
+    function CreateCanvas(width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        return canvas.getContext('2d');
+    }
+
+    function GridTexture(color1, color2, width = 32, height = 32, cols = 2, rows = 2) {
+        let texture = null;
+        const ctx = CreateCanvas(width, height);
+        const colWidth = width / cols;
+        const rowHeight = height / rows;
+        ctx.fillStyle = color1;
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = color2;
+        for (let y = 0; y < rows; y++) {
+            for (let x = (y % 2); x < cols; x += 2) {
+                ctx.fillRect(x * colWidth, y * rowHeight, colWidth, rowHeight);
+            }
+        }
+        return texture = new Texture('', ctx.canvas);
+    }
+
     class Demo extends Scene {
         constructor(game) {
             super(game);
-            //  PNG imported via '@rollup/plugin-image'
-            //  with: plugins: [ image({ dom: false })] (forcing it to be base64)
-            //  Also requires global.d.ts with:
-            //  declare module "*.png" {
-            //    const value: any;
-            //    export = value;
-            //  }
-            //  Warning: The asset gets bundled into your JS code!
-            //  Which can make it insanely huge. So, be careful.
+            // const red = SolidColorTexture('#ff0000', 256, 256);
+            // this.game.textures.add('red', red);
+            // this.world.addChild(new Sprite(this, 400, 300, 'red'));
+            const grid = GridTexture('#ff0000', '#00ff00', 256, 256, 8, 8);
+            this.game.textures.add('grid', grid);
+            this.world.addChild(new Sprite(this, 400, 300, 'grid'));
         }
-        preload() {
-            this.load.image('logo', 'assets/logo.png');
-        }
-        create() {
-            this.logo = new Sprite(this, 400, 300, 'logo');
-            this.world.addChild(this.logo);
-        }
-        update() {
-            this.logo.rotation += 0.01;
+    }
+    class Demo2 extends Scene {
+        constructor(game) {
+            super(game, 'Bob');
+            ImageFile(game, 'logo', 'assets/logo.png').then(() => {
+                this.world.addChild(new Sprite(this, 400, 300, 'logo'));
+            });
         }
     }
     function demo31 () {
-        let game = new Game({
+        new Game({
             width: 800,
             height: 600,
             backgroundColor: 0x000033,
             parent: 'gameParent',
-            scene: Demo
+            scene: [Demo, Demo2]
         });
     }
 

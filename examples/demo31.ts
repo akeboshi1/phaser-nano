@@ -1,54 +1,47 @@
 import Game from '../src/Game';
 import Scene from '../src/Scene';
 import Sprite from '../src/gameobjects/Sprite';
-// import LogoPNG from '../public/assets/logo.png';
+import ImageFile from '../src/loader/ImageFile';
+import GridTexture from '../src/textures/GridTexture';
+import SolidColorTexture from '../src/textures/SolidColorTexture';
 
 class Demo extends Scene
 {
-    logo: Sprite;
-
     constructor (game: Game)
     {
         super(game);
 
-        //  PNG imported via '@rollup/plugin-image'
-        //  with: plugins: [ image({ dom: false })] (forcing it to be base64)
+        // const red = SolidColorTexture('#ff0000', 256, 256);
+        // this.game.textures.add('red', red);
+        // this.world.addChild(new Sprite(this, 400, 300, 'red'));
 
-        //  Also requires global.d.ts with:
-        //  declare module "*.png" {
-        //    const value: any;
-        //    export = value;
-        //  }
-
-        //  Warning: The asset gets bundled into your JS code!
-        //  Which can make it insanely huge. So, be careful.
+        const grid = GridTexture('#ff0000', '#00ff00', 256, 256, 8, 8);
+        this.game.textures.add('grid', grid);
+        this.world.addChild(new Sprite(this, 400, 300, 'grid'));
     }
+}
 
-    preload ()
+class Demo2 extends Scene
+{
+    constructor (game: Game)
     {
-        this.load.image('logo', 'assets/logo.png');
-    }
+        super(game, 'Bob');
 
-    create ()
-    {
-        this.logo = new Sprite(this, 400, 300, 'logo');
+        ImageFile(game, 'logo', 'assets/logo.png').then(() => {
 
-        this.world.addChild(this.logo);
-    }
+            this.world.addChild(new Sprite(this, 400, 300, 'logo'));
 
-    update ()
-    {
-        this.logo.rotation += 0.01;
+        });
     }
 }
 
 export default function ()
 {
-    let game = new Game({
+    new Game({
         width: 800,
         height: 600,
         backgroundColor: 0x000033,
         parent: 'gameParent',
-        scene: Demo
+        scene: [ Demo, Demo2 ]
     });
 }
