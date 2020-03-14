@@ -23,7 +23,7 @@ export function TextureComponent<TBase extends Sprite>(Base: TBase): new() => Ob
             }
             else
             {
-                this.texture = this.scene.textures.get(key);
+                this.texture = this.scene.game.textures.get(key);
             }
     
             if (!this.texture)
