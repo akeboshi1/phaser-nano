@@ -114,6 +114,7 @@ export default class Loader
         return this.queue.length + this.inflight.size;
     }
 
+    /*
     image (key: string, url?: string)
     {
         let file = new File('image', key, this.getURL(key, url, '.png'), (file: File) => this.imageTagLoader(file));
@@ -171,6 +172,7 @@ export default class Loader
 
         return this;
     }
+    */
 
     XHRLoader (file: File)
     {
