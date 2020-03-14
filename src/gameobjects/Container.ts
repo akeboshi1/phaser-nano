@@ -3,7 +3,6 @@ import GameObject from './GameObject';
 import * as Components from '../components';
 import Install from '../components/Install';
 import IContainer from './IContainer';
-import Game from '../Game';
 
 export default class Container extends Install(GameObject, [
     Components.ContainerComponent
@@ -24,25 +23,6 @@ export default class Container extends Install(GameObject, [
         for (let i = 0; i < children.length; i++)
         {
             children[i].update(dt, now);
-        }
-    }
-
-    preRender (dt: number, now: number)
-    {
-        const game: Game = this.scene.game;
-
-        game.totalFrame++;
-
-        if (this.dirtyFrame >= game.frame)
-        {
-            game.dirtyFrame++;
-        }
-
-        const children = this.children;
-
-        for (let i = 0; i < children.length; i++)
-        {
-            // children[i].preRender(dt, now);
         }
     }
 
