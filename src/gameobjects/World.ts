@@ -1,55 +1,59 @@
 import Scene from '../Scene';
 import Container from './Container';
 import { IContainerComponent } from '../components/ContainerComponent';
-import Game from '../Game';
 import IContainerChild from './IContainerChild';
+import Camera from './Camera';
 
 export default class World extends Container
 {
-    renderList = [];
+    //  How many Game Objects were made dirty this frame?
+    dirtyFrame: number = 0;
 
-    constructor (scene: Scene)
+    //  How many Game Objects were processed this frame?
+    totalFrame: number = 0;
+
+    //  A list of Game Objects that will be rendered in the next pass
+    renderList: IContainerChild[];
+
+    camera: Camera;
+
+    constructor (scene: Scene, key: string)
     {
         super(scene);
+
+        this.name = key;
+
+        this.renderList = [];
+
+        this.camera = new Camera(scene, 0, 0);
     }
 
-    private scanChildren (root: IContainerComponent)
+    private scanChildren (root: IContainerComponent, gameFrame: number)
     {
         const children = root.getChildren();
 
         for (let i: number = 0; i < children.length; i++)
         {
-            this.buildRenderList(children[i]);
+            this.buildRenderList(children[i], gameFrame);
         }
     }
 
-    private buildRenderList (root: IContainerChild)
+    private buildRenderList (root: IContainerChild, gameFrame: number)
     {
-        const game: Game = this.scene.game;
-
         if (root.willRender())
         {
             this.renderList.push(root);
 
-            if (root.dirtyFrame >= game.frame)
+            if (root.dirtyFrame >= gameFrame)
             {
-                game.dirtyFrame++;
+                this.dirtyFrame++;
             }
         }
 
         if (root.isParent)
         {
-            this.scanChildren(root as unknown as IContainerComponent);
+            this.scanChildren(root as unknown as IContainerComponent, gameFrame);
         }
-    }
-
-    preRender ()
-    {
-        this.renderList = [];
-
-        this.scanChildren(this);
-
-        return this.renderList;
     }
 
     update (dt: number, now: number)
@@ -60,5 +64,17 @@ export default class World extends Container
         {
             children[i].update(dt, now);
         }
+    }
+
+    render (gameFrame: number): number
+    {
+        this.dirtyFrame = 0;
+        this.renderList.length = 0;
+
+        this.scanChildren(this, gameFrame);
+
+        this.totalFrame = this.renderList.length;
+
+        return this.dirtyFrame;
     }
 }
