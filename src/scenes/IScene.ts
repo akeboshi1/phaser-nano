@@ -1,12 +1,8 @@
 import Game from '../Game';
+import World from '../gameobjects/World';
 
 export default interface IScene
 {
-    key: string;
     game: Game;
-    init?: () => void;
-    preload?: () => void;
-    create: () => void;
-    update?: (delta?: number, now?: number) => void;
-    render?: () => void;
+    world: World;
 }

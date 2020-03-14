@@ -1,11 +1,12 @@
 import Game from '../Game';
 import Scene from '../Scene';
-import IScene from './IScene';
+import SceneRunner from './SceneRunner';
+import ISceneRunner from './ISceneRunner';
 
 export default class SceneManager
 {
     game: Game;
-    scenes: Map<string, Scene>;
+    scenes: Map<ISceneRunner, Scene>;
 
     //  How many Game Objects were made dirty this frame across all Scenes?
     dirtyFrame: number = 0;
@@ -15,7 +16,7 @@ export default class SceneManager
 
     renderList: any[];
 
-    constructor (game: Game, sceneConfig)
+    constructor (game: Game, scenes: [])
     {
         this.game = game;
 
@@ -23,21 +24,27 @@ export default class SceneManager
 
         this.renderList = [];
 
-        sceneConfig = [].concat(sceneConfig);
+        scenes.forEach((scene, index) => {
 
-        sceneConfig.forEach((scene) => {
-            this.addScene(scene);
-        })
+            //  The first scenein the array is always active, the rest asleep
+            let active: boolean = (index === 0) ? true : false;
+
+            this.add(scene, active, active);
+
+        });
     }
 
     update (delta: number, now: number)
     {
-        this.scenes.forEach(scene => {
+        for (const [ sceneRunner, scene ] of this.scenes)
+        {
+            if (!sceneRunner.active)
+            {
+                sceneRunner.update(delta, now);
 
-            // scene.update(dt, now);
-            scene.world.update(delta, now);
-
-        });
+                scene.world.update(delta, now);
+            }
+        }
     }
 
     render (gameFrame: number): number
@@ -49,81 +56,102 @@ export default class SceneManager
         this.dirtyFrame = 0;
         this.totalFrame = 0;
 
-        this.scenes.forEach(scene => {
+        for (const [ sceneRunner, scene ] of this.scenes)
+        {
+            if (sceneRunner.visible)
+            {
+                let world = scene.world;
 
-            let world = scene.world;
-
-            this.dirtyFrame += world.render(gameFrame);
-            this.totalFrame += world.totalFrame;
-
-            renderList.push(world.camera);
-            renderList.push(world.renderList);
-
-        });
+                this.dirtyFrame += world.render(gameFrame);
+                this.totalFrame += world.totalFrame;
+    
+                renderList.push(world.camera);
+                renderList.push(world.renderList);
+            }
+        }
 
         return this.dirtyFrame;
     }
 
-    addScene (sceneConfig: IScene | Scene)
+    add (scene: any | Scene, active: boolean = false, visible: boolean = false): Scene
     {
-        let scene: Scene;
+        const game = this.game;
 
-        if (sceneConfig instanceof Scene)
+        if (typeof scene === 'object')
         {
-            scene = this.createSceneFromInstance(sceneConfig);
+            scene = new scene(game);
         }
-        else if (typeof sceneConfig === 'object')
+        else
         {
-            scene = this.createSceneFromObject(sceneConfig);
-        }
-        else if (typeof sceneConfig === 'function')
-        {
-            scene = this.createSceneFromFunction(sceneConfig);
+            scene.game = game;
         }
 
         console.log('Scene.addScene', scene.world.name);
 
-        this.scenes.set(scene.world.name, scene);
+        //  Store the scene constructor somewhere?
+
+        this.scenes.set(SceneRunner(scene, active, visible), scene);
+
+        return scene;
     }
 
-    createSceneFromInstance (newScene: Scene): Scene
+    getSceneKey (scene: string | Scene): string
     {
-        newScene.game = this.game;
-
-        return newScene;
+        return (scene instanceof Scene) ? scene.world.name : scene;
     }
 
-    createSceneFromObject (scene: any): Scene
+    start ()
     {
-        let newScene = new Scene(this.game);
+        //  Stop the calling scene and start the new one
+    }
 
-        //  Extract callbacks
+    stop ()
+    {
+        //  Stop the calling scene
+    }
 
-        const defaults = [ 'init', 'preload', 'create', 'update', 'render' ];
+    launch (scene: string | Scene)
+    {
+        //  Needs to create an instance of the scene
 
-        defaults.forEach((method) => {
+        this.setActive(scene);
+        this.setVisible(scene);
+    }
 
-            if (scene.hasOwnProperty(method))
+    sleep (scene: string | Scene)
+    {
+        this.setActive(scene, false);
+        this.setVisible(scene, false);
+    }
+
+    wake ()
+    {
+
+    }
+
+    setActive (scene: string | Scene, active: boolean = true)
+    {
+        const key: string = this.getSceneKey(scene);
+
+        for (const sceneRunner of this.scenes.keys())
+        {
+            if (sceneRunner.key === key)
             {
-                newScene[method] = scene[method];
+                sceneRunner.active = active;
             }
-
-        });
-
-        return newScene;
+        }
     }
 
-    createSceneFromFunction (scene: any): Scene
+    setVisible (scene: string | Scene, visible: boolean = true)
     {
-        var newScene = new scene(this.game);
+        const key: string = this.getSceneKey(scene);
 
-        if (newScene instanceof Scene)
+        for (const sceneRunner of this.scenes.keys())
         {
-            return this.createSceneFromInstance(newScene);
-        }
-        else
-        {
-            return newScene;
+            if (sceneRunner.key === key)
+            {
+                sceneRunner.visible = visible;
+            }
         }
     }
 }

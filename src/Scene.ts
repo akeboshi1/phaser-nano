@@ -11,23 +11,4 @@ export default class Scene
         this.game = game;
         this.world = new World(this, key);
     }
-
-    /*
-    init ()
-    {
-    }
-
-    preload ()
-    {
-    }
-
-    create ()
-    {
-    }
-
-    update (delta?: number, time?: number)
-    {
-    }
-    */
-
 }

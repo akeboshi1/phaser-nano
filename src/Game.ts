@@ -74,7 +74,7 @@ export default class Game extends EventEmitter
 
         this.renderer = renderer;
         this.textures = new TextureManager(this);
-        this.scenes = new SceneManager(this, config.scene);
+        this.scenes = new SceneManager(this, [].concat(config.scene));
 
         this.banner(this.VERSION);
 
