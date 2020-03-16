@@ -1,14 +1,15 @@
 import Game from './Game';
 import World from './gameobjects/World';
+import ISceneConfig from './scenes/ISceneConfig';
+import SceneManager from './scenes/SceneManager';
 
 export default class Scene
 {
     game: Game;
     world: World;
 
-    constructor (game: Game, key: string = 'default')
+    constructor (sceneManager: SceneManager, config?: string | ISceneConfig)
     {
-        this.game = game;
-        this.world = new World(this, key);
+        sceneManager.init(this, config);
     }
 }

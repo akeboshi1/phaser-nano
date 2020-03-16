@@ -4,12 +4,14 @@ import Sprite from '../src/gameobjects/Sprite';
 import ImageFile from '../src/loader/ImageFile';
 import GridTexture from '../src/textures/GridTexture';
 import SolidColorTexture from '../src/textures/SolidColorTexture';
+import ISceneConfig from '../src/scenes/ISceneConfig';
+import SceneManager from '../src/scenes/SceneManager';
 
 class Demo extends Scene
 {
-    constructor (game: Game)
+    constructor (sceneManager: SceneManager)
     {
-        super(game);
+        super(sceneManager);
 
         // const red = SolidColorTexture('#ff0000', 256, 256);
         // this.game.textures.add('red', red);

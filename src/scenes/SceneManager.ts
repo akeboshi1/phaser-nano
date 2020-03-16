@@ -1,11 +1,15 @@
 import Game from '../Game';
 import Scene from '../Scene';
+import World from '../gameobjects/World';
 import SceneRunner from './SceneRunner';
 import ISceneRunner from './ISceneRunner';
+import ISceneConfig from './ISceneConfig';
 
 export default class SceneManager
 {
     game: Game;
+
+    //  The currently active scene instances
     scenes: Map<ISceneRunner, Scene>;
 
     //  How many Game Objects were made dirty this frame across all Scenes?
@@ -26,12 +30,65 @@ export default class SceneManager
 
         scenes.forEach((scene, index) => {
 
-            //  The first scenein the array is always active, the rest asleep
-            let active: boolean = (index === 0) ? true : false;
-
-            this.add(scene, active, active);
+            //  The first scene in the array is always active, the rest asleep
+            // let active: boolean = (index === 0) ? true : false;
+            // this.add(scene, active, active);
 
         });
+    }
+
+    init (scene: Scene, config?: string | ISceneConfig)
+    {
+        const sceneConfig = {
+            key: 'default',
+            active: false,
+            visible: false
+        };
+
+        if (typeof config === 'string')
+        {
+            sceneConfig.key = config;
+        }
+        else if (config)
+        {
+            if (config.hasOwnProperty('key'))
+            {
+                sceneConfig.key = config.key;
+            }
+
+            if (config.hasOwnProperty('active'))
+            {
+                sceneConfig.active = config.active;
+            }
+
+            if (config.hasOwnProperty('visible'))
+            {
+                sceneConfig.visible = config.visible;
+            }
+        }
+
+        scene.game = this.game;
+        scene.world = new World(scene, config.key);
+
+        // this.setActive(scene, config.active);
+        // this.setVisible(scene, config.visible);
+    }
+
+    add (scene: any, active: boolean = false, visible: boolean = false)
+    {
+        //  Create an instance of the Scene using the default config
+
+        scene = new scene(this, {
+            key: 'default',
+            active,
+            visible
+        });
+
+        console.log('Scene.addScene', scene.world.name);
+
+        this.scenes.set(SceneRunner(scene, active, visible), scene);
+
+        return scene;
     }
 
     update (delta: number, now: number)
@@ -73,7 +130,7 @@ export default class SceneManager
         return this.dirtyFrame;
     }
 
-    add (scene: any | Scene, active: boolean = false, visible: boolean = false): Scene
+    OLDadd (scene: any | Scene, active: boolean = false, visible: boolean = false): Scene
     {
         const game = this.game;
 
