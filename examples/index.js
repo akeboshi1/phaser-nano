@@ -470,7 +470,8 @@ void main (void)
 
     class Scene {
         constructor(game, config) {
-            game.scenes.init(this, config);
+            this.game = game;
+            const key = game.scenes.init(this, config);
         }
     }
 
@@ -1321,6 +1322,7 @@ void main (void)
             //  How many Game Objects were processed this frame across all Scenes?
             this.totalFrame = 0;
             this.game = game;
+            this.classes = new Map();
             this.scenes = new Map();
             this.renderList = [];
         }
@@ -1350,9 +1352,13 @@ void main (void)
             }
             scene.game = this.game;
             scene.world = new World(scene, sceneConfig.key);
+            this.classes.set(sceneConfig.key, this._tempScene);
             this.scenes.set(SceneRunner(scene, sceneConfig), scene);
+            console.log('SceneManager.init', sceneConfig.key);
         }
         add(scene) {
+            this._tempScene = scene;
+            console.log('SceneManager.add', scene);
             scene = new scene(this.game);
             return scene;
         }
@@ -1389,11 +1395,41 @@ void main (void)
         stop() {
             //  Stop the calling scene
         }
-        launch(scene) {
-            //  Needs to create an instance of the scene
+        duplicate(source, newKey) {
+            let scene = this.classes.get(source);
+            if (scene) {
+                this._tempScene = scene;
+                console.log('SceneManager.duplicate', scene);
+                scene = new scene(this.game, newKey);
+            }
+        }
+        /*
+        launch (scene: string | Scene, newKey: string = '')
+        {
+            console.log('SceneManager.launch', scene);
+
+            if (typeof scene === 'string')
+            {
+                scene = this.classes.get(scene);
+
+                if (!scene)
+                {
+                    return;
+                }
+                else
+                {
+
+                }
+            }
+            else
+            {
+                this.add(scene);
+            }
+
             this.setActive(scene);
             this.setVisible(scene);
         }
+        */
         sleep(scene) {
             this.setActive(scene, false);
             this.setVisible(scene, false);
@@ -1416,6 +1452,9 @@ void main (void)
                 }
             }
         }
+        getTotal() {
+            return this.scenes.size;
+        }
     }
 
     // import AtlasParser from './AtlasParser';
@@ -1431,6 +1470,9 @@ void main (void)
             else {
                 return this.textures.get('__MISSING');
             }
+        }
+        has(key) {
+            return this.textures.has(key);
         }
         add(key, source) {
             let texture;
@@ -1869,13 +1911,13 @@ void main (void)
 
     class Demo extends Scene {
         constructor(game) {
-            super(game);
-            // const red = SolidColorTexture('#ff0000', 256, 256);
-            // this.game.textures.add('red', red);
-            // this.world.addChild(new Sprite(this, 400, 300, 'red'));
-            const grid = GridTexture('#ff0000', '#00ff00', 256, 256, 8, 8);
-            this.game.textures.add('grid', grid);
-            this.world.addChild(new Sprite(this, 400, 300, 'grid'));
+            super(game, 'gridScene');
+            if (!this.game.textures.has('grid')) {
+                this.game.textures.add('grid', GridTexture('#ff0000', '#00ff00', 64, 64, 4, 4));
+            }
+            const x = Math.random() * 800;
+            const y = Math.random() * 600;
+            this.world.addChild(new Sprite(this, x, y, 'grid'));
         }
     }
     class Demo2 extends Scene {
@@ -1887,12 +1929,18 @@ void main (void)
         }
     }
     function demo31 () {
-        new Game({
+        const game = new Game({
             width: 800,
             height: 600,
             backgroundColor: 0x000033,
             parent: 'gameParent',
             scene: [Demo, Demo2]
+        });
+        let i = 0;
+        window.addEventListener('click', () => {
+            console.log('click');
+            game.scenes.duplicate('gridScene', 'gridScene' + i);
+            i++;
         });
     }
 

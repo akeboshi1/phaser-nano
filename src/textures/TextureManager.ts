@@ -26,6 +26,11 @@ export default class TextureManager
         }
     }
 
+    has (key: string): boolean
+    {
+        return this.textures.has(key);
+    }
+
     add (key: string, source: Texture | HTMLImageElement)
     {
         let texture: Texture;

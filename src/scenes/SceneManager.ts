@@ -6,10 +6,14 @@ import ISceneRunner from './ISceneRunner';
 import ISceneConfig from './ISceneConfig';
 import IScene from './IScene';
 import GetConfigValue from './GetConfigValue';
+import EventEmitter from '../core/EventEmitter';
 
-export default class SceneManager
+export default class SceneManager extends EventEmitter
 {
     game: Game;
+
+    //  The Scene classes from which to create instances
+    classes: Map<string, any>;
 
     //  The currently active scene instances
     scenes: Map<ISceneRunner, Scene>;
@@ -24,11 +28,16 @@ export default class SceneManager
 
     constructor (game: Game)
     {
+        super();
+
         this.game = game;
 
+        this.classes = new Map();
         this.scenes = new Map();
 
         this.renderList = [];
+
+        this.on('init', this.init, this);
     }
 
     boot (scenes: any[] | IScene[])
@@ -67,15 +76,26 @@ export default class SceneManager
             sceneConfig.visible = GetConfigValue(config, 'visible', sceneConfig.active) as boolean;
         }
 
+        
+
         scene.game = this.game;
         scene.world = new World(scene, sceneConfig.key);
 
+        this.classes.set(sceneConfig.key, this._tempScene);
         this.scenes.set(SceneRunner(scene, sceneConfig), scene);
+
+        console.log('SceneManager.init', sceneConfig.key);
     }
 
     add (scene: any)
     {
+        // this._tempScene = scene;
+
+        console.log('SceneManager.add', scene);
+
         scene = new scene(this.game);
+
+
 
         return scene;
     }
@@ -134,13 +154,47 @@ export default class SceneManager
         //  Stop the calling scene
     }
 
-    launch (scene: string | Scene)
+    duplicate (source: string, newKey: string)
     {
-        //  Needs to create an instance of the scene
+        let scene = this.classes.get(source);
+
+        if (scene)
+        {
+            this._tempScene = scene;
+
+            console.log('SceneManager.duplicate', scene);
+    
+            scene = new scene(this.game, newKey);
+        }
+    }
+
+    /*
+    launch (scene: string | Scene, newKey: string = '')
+    {
+        console.log('SceneManager.launch', scene);
+
+        if (typeof scene === 'string')
+        {
+            scene = this.classes.get(scene);
+
+            if (!scene)
+            {
+                return;
+            }
+            else
+            {
+
+            }
+        }
+        else
+        {
+            this.add(scene);
+        }
 
         this.setActive(scene);
         this.setVisible(scene);
     }
+    */
 
     sleep (scene: string | Scene)
     {
@@ -177,5 +231,25 @@ export default class SceneManager
                 sceneRunner.visible = visible;
             }
         }
+    }
+
+    keyExists (scene: string | Scene): boolean
+    {
+        const key: string = this.getSceneKey(scene);
+
+        for (const sceneRunner of this.scenes.keys())
+        {
+            if (sceneRunner.key === key)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    getTotal (): number
+    {
+        return this.scenes.size;
     }
 }

@@ -1,7 +1,7 @@
 import Game from './Game';
 import World from './gameobjects/World';
 import ISceneConfig from './scenes/ISceneConfig';
-import SceneManager from './scenes/SceneManager';
+import GetConfigValue from './scenes/GetConfigValue';
 
 export default class Scene
 {
@@ -10,6 +10,8 @@ export default class Scene
 
     constructor (game: Game, config?: string | ISceneConfig)
     {
-        game.scenes.init(this, config);
+        this.game = game;
+
+        const key = game.scenes.init(this, config);
     }
 }

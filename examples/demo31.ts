@@ -3,23 +3,22 @@ import Scene from '../src/Scene';
 import Sprite from '../src/gameobjects/Sprite';
 import ImageFile from '../src/loader/ImageFile';
 import GridTexture from '../src/textures/GridTexture';
-import SolidColorTexture from '../src/textures/SolidColorTexture';
 
 class Demo extends Scene
 {
     constructor (game: Game)
     {
-        super(game);
+        super(game, 'gridScene');
 
-        // const red = SolidColorTexture('#ff0000', 256, 256);
-        // this.game.textures.add('red', red);
-        // this.world.addChild(new Sprite(this, 400, 300, 'red'));
+        if (!this.game.textures.has('grid'))
+        {
+            this.game.textures.add('grid', GridTexture('#ff0000', '#00ff00', 64, 64, 4, 4));
+        }
 
-        const grid = GridTexture('#ff0000', '#00ff00', 256, 256, 8, 8);
-        this.game.textures.add('grid', grid);
-        this.world.addChild(new Sprite(this, 400, 300, 'grid'));
+        const x = Math.random() * 800;
+        const y = Math.random() * 600;
 
-
+        this.world.addChild(new Sprite(this, x, y, 'grid'));
     }
 }
 
@@ -39,11 +38,23 @@ class Demo2 extends Scene
 
 export default function ()
 {
-    new Game({
+    const game = new Game({
         width: 800,
         height: 600,
         backgroundColor: 0x000033,
         parent: 'gameParent',
         scene: [ Demo, Demo2 ]
+    });
+
+    let i = 0;
+
+    window.addEventListener('click', () => {
+
+        console.log('click');
+
+        game.scenes.duplicate('gridScene', 'gridScene' + i);
+
+        i++;
+
     });
 }
