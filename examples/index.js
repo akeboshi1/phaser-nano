@@ -468,6 +468,12 @@ void main (void)
         }
     }
 
+    class Scene {
+        constructor(game, config) {
+            game.scenes.init(this, config);
+        }
+    }
+
     function Install(baseClass, components) {
         let newClass = baseClass;
         components.forEach(component => {
@@ -1285,15 +1291,31 @@ void main (void)
         }
     }
 
-    class Scene {
-        constructor(game, key = 'default') {
-            this.game = game;
-            this.world = new World(this, key);
+    function NOOP() {
+        //  A no-op function is intentially blank
+    }
+
+    function GetConfigValue(config, property, defaultValue) {
+        if (config.hasOwnProperty(property)) {
+            return config[property];
+        }
+        else {
+            return defaultValue;
         }
     }
 
+    function SceneRunner(scene, config) {
+        return {
+            key: scene.world.name,
+            scene,
+            active: config.active,
+            visible: config.visible,
+            update: GetConfigValue(scene, 'update', NOOP)
+        };
+    }
+
     class SceneManager {
-        constructor(game, sceneConfig) {
+        constructor(game) {
             //  How many Game Objects were made dirty this frame across all Scenes?
             this.dirtyFrame = 0;
             //  How many Game Objects were processed this frame across all Scenes?
@@ -1301,67 +1323,97 @@ void main (void)
             this.game = game;
             this.scenes = new Map();
             this.renderList = [];
-            sceneConfig = [].concat(sceneConfig);
-            sceneConfig.forEach((scene) => {
-                this.addScene(scene);
+        }
+        boot(scenes) {
+            scenes.forEach((scene) => {
+                this.add(scene);
             });
         }
+        init(scene, config = {}) {
+            const sceneConfig = {
+                key: '',
+                active: false,
+                visible: false
+            };
+            const size = this.scenes.size;
+            if (typeof config === 'string') {
+                sceneConfig.key = config;
+                if (size === 0) {
+                    sceneConfig.active = true;
+                    sceneConfig.visible = true;
+                }
+            }
+            else if (config || (!config && size === 0)) {
+                sceneConfig.key = GetConfigValue(config, 'key', 'scene' + size.toString());
+                sceneConfig.active = GetConfigValue(config, 'active', (size === 0));
+                sceneConfig.visible = GetConfigValue(config, 'visible', sceneConfig.active);
+            }
+            scene.game = this.game;
+            scene.world = new World(scene, sceneConfig.key);
+            this.scenes.set(SceneRunner(scene, sceneConfig), scene);
+        }
+        add(scene) {
+            scene = new scene(this.game);
+            return scene;
+        }
         update(delta, now) {
-            this.scenes.forEach(scene => {
-                // scene.update(dt, now);
-                scene.world.update(delta, now);
-            });
+            for (const [sceneRunner, scene] of this.scenes) {
+                if (!sceneRunner.active) {
+                    sceneRunner.update(delta, now);
+                    scene.world.update(delta, now);
+                }
+            }
         }
         render(gameFrame) {
             const renderList = this.renderList;
             renderList.length = 0;
             this.dirtyFrame = 0;
             this.totalFrame = 0;
-            this.scenes.forEach(scene => {
-                let world = scene.world;
-                this.dirtyFrame += world.render(gameFrame);
-                this.totalFrame += world.totalFrame;
-                renderList.push(world.camera);
-                renderList.push(world.renderList);
-            });
+            for (const [sceneRunner, scene] of this.scenes) {
+                if (sceneRunner.visible) {
+                    let world = scene.world;
+                    this.dirtyFrame += world.render(gameFrame);
+                    this.totalFrame += world.totalFrame;
+                    renderList.push(world.camera);
+                    renderList.push(world.renderList);
+                }
+            }
             return this.dirtyFrame;
         }
-        addScene(sceneConfig) {
-            let scene;
-            if (sceneConfig instanceof Scene) {
-                scene = this.createSceneFromInstance(sceneConfig);
-            }
-            else if (typeof sceneConfig === 'object') {
-                scene = this.createSceneFromObject(sceneConfig);
-            }
-            else if (typeof sceneConfig === 'function') {
-                scene = this.createSceneFromFunction(sceneConfig);
-            }
-            console.log('Scene.addScene', scene.world.name);
-            this.scenes.set(scene.world.name, scene);
+        getSceneKey(scene) {
+            return (scene instanceof Scene) ? scene.world.name : scene;
         }
-        createSceneFromInstance(newScene) {
-            newScene.game = this.game;
-            return newScene;
+        start() {
+            //  Stop the calling scene and start the new one
         }
-        createSceneFromObject(scene) {
-            let newScene = new Scene(this.game);
-            //  Extract callbacks
-            const defaults = ['init', 'preload', 'create', 'update', 'render'];
-            defaults.forEach((method) => {
-                if (scene.hasOwnProperty(method)) {
-                    newScene[method] = scene[method];
+        stop() {
+            //  Stop the calling scene
+        }
+        launch(scene) {
+            //  Needs to create an instance of the scene
+            this.setActive(scene);
+            this.setVisible(scene);
+        }
+        sleep(scene) {
+            this.setActive(scene, false);
+            this.setVisible(scene, false);
+        }
+        wake() {
+        }
+        setActive(scene, active = true) {
+            const key = this.getSceneKey(scene);
+            for (const sceneRunner of this.scenes.keys()) {
+                if (sceneRunner.key === key) {
+                    sceneRunner.active = active;
                 }
-            });
-            return newScene;
-        }
-        createSceneFromFunction(scene) {
-            var newScene = new scene(this.game);
-            if (newScene instanceof Scene) {
-                return this.createSceneFromInstance(newScene);
             }
-            else {
-                return newScene;
+        }
+        setVisible(scene, visible = true) {
+            const key = this.getSceneKey(scene);
+            for (const sceneRunner of this.scenes.keys()) {
+                if (sceneRunner.key === key) {
+                    sceneRunner.visible = visible;
+                }
             }
         }
     }
@@ -1551,7 +1603,8 @@ void main (void)
             AddToDOM(renderer.canvas, config.parent);
             this.renderer = renderer;
             this.textures = new TextureManager(this);
-            this.scenes = new SceneManager(this, config.scene);
+            this.scenes = new SceneManager(this);
+            this.scenes.boot([].concat(config.scene));
             this.banner(this.VERSION);
             //  Visibility API
             document.addEventListener('visibilitychange', () => {
@@ -1827,7 +1880,7 @@ void main (void)
     }
     class Demo2 extends Scene {
         constructor(game) {
-            super(game, 'Bob');
+            super(game, 'image');
             ImageFile(game, 'logo', 'assets/logo.png').then(() => {
                 this.world.addChild(new Sprite(this, 400, 300, 'logo'));
             });

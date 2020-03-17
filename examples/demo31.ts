@@ -4,14 +4,12 @@ import Sprite from '../src/gameobjects/Sprite';
 import ImageFile from '../src/loader/ImageFile';
 import GridTexture from '../src/textures/GridTexture';
 import SolidColorTexture from '../src/textures/SolidColorTexture';
-import ISceneConfig from '../src/scenes/ISceneConfig';
-import SceneManager from '../src/scenes/SceneManager';
 
 class Demo extends Scene
 {
-    constructor (sceneManager: SceneManager)
+    constructor (game: Game)
     {
-        super(sceneManager);
+        super(game);
 
         // const red = SolidColorTexture('#ff0000', 256, 256);
         // this.game.textures.add('red', red);
@@ -20,6 +18,8 @@ class Demo extends Scene
         const grid = GridTexture('#ff0000', '#00ff00', 256, 256, 8, 8);
         this.game.textures.add('grid', grid);
         this.world.addChild(new Sprite(this, 400, 300, 'grid'));
+
+
     }
 }
 
@@ -27,7 +27,7 @@ class Demo2 extends Scene
 {
     constructor (game: Game)
     {
-        super(game, 'Bob');
+        super(game, 'image');
 
         ImageFile(game, 'logo', 'assets/logo.png').then(() => {
 

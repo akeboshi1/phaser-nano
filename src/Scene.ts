@@ -8,8 +8,8 @@ export default class Scene
     game: Game;
     world: World;
 
-    constructor (sceneManager: SceneManager, config?: string | ISceneConfig)
+    constructor (game: Game, config?: string | ISceneConfig)
     {
-        sceneManager.init(this, config);
+        game.scenes.init(this, config);
     }
 }

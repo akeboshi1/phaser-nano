@@ -4,6 +4,8 @@ import World from '../gameobjects/World';
 import SceneRunner from './SceneRunner';
 import ISceneRunner from './ISceneRunner';
 import ISceneConfig from './ISceneConfig';
+import IScene from './IScene';
+import GetConfigValue from './GetConfigValue';
 
 export default class SceneManager
 {
@@ -20,73 +22,60 @@ export default class SceneManager
 
     renderList: any[];
 
-    constructor (game: Game, scenes: [])
+    constructor (game: Game)
     {
         this.game = game;
 
         this.scenes = new Map();
 
         this.renderList = [];
+    }
 
-        scenes.forEach((scene, index) => {
+    boot (scenes: any[] | IScene[])
+    {
+        scenes.forEach((scene) => {
 
-            //  The first scene in the array is always active, the rest asleep
-            // let active: boolean = (index === 0) ? true : false;
-            // this.add(scene, active, active);
+            this.add(scene);
 
         });
     }
 
-    init (scene: Scene, config?: string | ISceneConfig)
+    init (scene: Scene, config: string | ISceneConfig = {})
     {
         const sceneConfig = {
-            key: 'default',
+            key: '',
             active: false,
             visible: false
         };
 
+        const size = this.scenes.size;
+
         if (typeof config === 'string')
         {
             sceneConfig.key = config;
+
+            if (size === 0)
+            {
+                sceneConfig.active = true;
+                sceneConfig.visible = true;
+            }
         }
-        else if (config)
+        else if (config || (!config && size === 0))
         {
-            if (config.hasOwnProperty('key'))
-            {
-                sceneConfig.key = config.key;
-            }
-
-            if (config.hasOwnProperty('active'))
-            {
-                sceneConfig.active = config.active;
-            }
-
-            if (config.hasOwnProperty('visible'))
-            {
-                sceneConfig.visible = config.visible;
-            }
+            sceneConfig.key = GetConfigValue(config, 'key', 'scene' + size.toString()) as string;
+            sceneConfig.active = GetConfigValue(config, 'active', (size === 0)) as boolean;
+            sceneConfig.visible = GetConfigValue(config, 'visible', sceneConfig.active) as boolean;
         }
 
         scene.game = this.game;
-        scene.world = new World(scene, config.key);
+        scene.world = new World(scene, sceneConfig.key);
 
-        // this.setActive(scene, config.active);
-        // this.setVisible(scene, config.visible);
+        this.scenes.set(SceneRunner(scene, sceneConfig), scene);
     }
 
-    add (scene: any, active: boolean = false, visible: boolean = false)
+    add (scene: any)
     {
-        //  Create an instance of the Scene using the default config
-
-        scene = new scene(this, {
-            key: 'default',
-            active,
-            visible
-        });
-
-        console.log('Scene.addScene', scene.world.name);
-
-        this.scenes.set(SceneRunner(scene, active, visible), scene);
+        scene = new scene(this.game);
 
         return scene;
     }
@@ -128,28 +117,6 @@ export default class SceneManager
         }
 
         return this.dirtyFrame;
-    }
-
-    OLDadd (scene: any | Scene, active: boolean = false, visible: boolean = false): Scene
-    {
-        const game = this.game;
-
-        if (typeof scene === 'object')
-        {
-            scene = new scene(game);
-        }
-        else
-        {
-            scene.game = game;
-        }
-
-        console.log('Scene.addScene', scene.world.name);
-
-        //  Store the scene constructor somewhere?
-
-        this.scenes.set(SceneRunner(scene, active, visible), scene);
-
-        return scene;
     }
 
     getSceneKey (scene: string | Scene): string
