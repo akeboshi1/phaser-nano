@@ -121,7 +121,7 @@ export default class SceneManager extends EventEmitter
             this.sceneIndex++;
         }
 
-        // console.log('SceneManager.init', sceneConfig.key);
+        // console.log('SceneManager.init', sceneConfig);
     }
 
     add (scene: any, newKey?: string): Scene
@@ -142,7 +142,7 @@ export default class SceneManager extends EventEmitter
         {
             if (sceneRunner.active)
             {
-                sceneRunner.update(delta, now);
+                sceneRunner.update.call(sceneRunner.scene, delta, now);
 
                 scene.world.update(delta, now);
             }
@@ -241,16 +241,14 @@ export default class SceneManager extends EventEmitter
 
         if (runner)
         {
-            // console.log('SceneManager.start', runner.key, runner.index);
+            scene = runner.scene;
 
-            this.wake(runner.scene);
+            this.wake(scene);
 
             //  Boot
-            runner.boot();
+            runner.boot.call(scene);
 
-            this.emit('boot', runner.scene);
-
-            // console.log(runner);
+            this.emit('boot', scene);
 
             if (stopScene)
             {
@@ -267,14 +265,14 @@ export default class SceneManager extends EventEmitter
 
         if (runner)
         {
-            // console.log('SceneManager.stop', runner.key, runner.index);
+            scene = runner.scene;
 
-            this.sleep(runner.scene);
+            this.sleep(scene);
 
             //  Shutdown
-            runner.shutdown();
+            runner.shutdown.call(scene);
 
-            this.emit('shutdown', runner.scene);
+            this.emit('shutdown', scene);
 
             this.flush = true;
         }

@@ -24,19 +24,37 @@ class Demo extends Scene
 
 class Demo2 extends Scene
 {
+    star: Sprite;
+
     constructor (game: Game)
     {
-        super(game, { key: 'image' });
+        super(game, { key: 'image', active: false });
 
-        ImageFile(game, 'logo', 'assets/logo.png').then(() => {
+        if (!this.game.textures.has('star'))
+        {
+            ImageFile(game, 'star', 'assets/star.png').then(() => this.addStar());
+        }
+        else
+        {
+            this.addStar();
+        }
+    }
 
-            this.world.addChild(new Sprite(this, 400, 300, 'logo'));
+    addStar ()
+    {
+        const x = Math.random() * 800;
+        const y = Math.random() * 600;
 
-        });
+        this.star = new Sprite(this, x, y, 'star');
+
+        this.world.addChild(this.star);
+
+        this.game.scenes.wake(this);
     }
 
     update ()
     {
+        this.star.rotation += 0.01;
     }
 }
 
@@ -50,14 +68,15 @@ export default function ()
         scene: [ Demo, Demo2 ]
     });
 
+    window['game'] = game;
+
     let i = 0;
 
     window.addEventListener('click', () => {
 
-        console.log('click');
-
-        game.scenes.start('image', 'gridScene');
+        // game.scenes.start('image', 'gridScene');
         // game.scenes.spawn('gridScene', 'gridScene' + i);
+        game.scenes.spawn('image', 'image' + i, false);
 
         i++;
 

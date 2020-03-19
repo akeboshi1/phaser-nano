@@ -1503,7 +1503,7 @@ void main (void)
                 this.flush = true;
                 this.sceneIndex++;
             }
-            // console.log('SceneManager.init', sceneConfig.key);
+            // console.log('SceneManager.init', sceneConfig);
         }
         add(scene, newKey) {
             this._tempScene = scene;
@@ -1515,7 +1515,7 @@ void main (void)
         update(delta, now) {
             for (const [sceneRunner, scene] of this.scenes) {
                 if (sceneRunner.active) {
-                    sceneRunner.update(delta, now);
+                    sceneRunner.update.call(sceneRunner.scene, delta, now);
                     scene.world.update(delta, now);
                 }
             }
@@ -1576,12 +1576,11 @@ void main (void)
         start(scene, stopScene) {
             const runner = this.getSceneRunner(scene);
             if (runner) {
-                // console.log('SceneManager.start', runner.key, runner.index);
-                this.wake(runner.scene);
+                scene = runner.scene;
+                this.wake(scene);
                 //  Boot
-                runner.boot();
-                this.emit('boot', runner.scene);
-                // console.log(runner);
+                runner.boot.call(scene);
+                this.emit('boot', scene);
                 if (stopScene) {
                     this.stop(stopScene);
                 }
@@ -1591,11 +1590,11 @@ void main (void)
         stop(scene) {
             const runner = this.getSceneRunner(scene);
             if (runner) {
-                // console.log('SceneManager.stop', runner.key, runner.index);
-                this.sleep(runner.scene);
+                scene = runner.scene;
+                this.sleep(scene);
                 //  Shutdown
-                runner.shutdown();
-                this.emit('shutdown', runner.scene);
+                runner.shutdown.call(scene);
+                this.emit('shutdown', scene);
                 this.flush = true;
             }
         }
@@ -1979,12 +1978,23 @@ void main (void)
     }
     class Demo2 extends Scene {
         constructor(game) {
-            super(game, { key: 'image' });
-            ImageFile(game, 'logo', 'assets/logo.png').then(() => {
-                this.world.addChild(new Sprite(this, 400, 300, 'logo'));
-            });
+            super(game, { key: 'image', active: false });
+            if (!this.game.textures.has('star')) {
+                ImageFile(game, 'star', 'assets/star.png').then(() => this.addStar());
+            }
+            else {
+                this.addStar();
+            }
+        }
+        addStar() {
+            const x = Math.random() * 800;
+            const y = Math.random() * 600;
+            this.star = new Sprite(this, x, y, 'star');
+            this.world.addChild(this.star);
+            this.game.scenes.wake(this);
         }
         update() {
+            this.star.rotation += 0.01;
         }
     }
     function demo31 () {
@@ -1995,9 +2005,13 @@ void main (void)
             parent: 'gameParent',
             scene: [Demo, Demo2]
         });
+        window['game'] = game;
+        let i = 0;
         window.addEventListener('click', () => {
-            console.log('click');
-            game.scenes.start('image', 'gridScene');
+            // game.scenes.start('image', 'gridScene');
+            // game.scenes.spawn('gridScene', 'gridScene' + i);
+            game.scenes.spawn('image', 'image' + i, false);
+            i++;
         });
     }
 
