@@ -26,13 +26,17 @@ class Demo2 extends Scene
 {
     constructor (game: Game)
     {
-        super(game, 'image');
+        super(game, { key: 'image' });
 
         ImageFile(game, 'logo', 'assets/logo.png').then(() => {
 
             this.world.addChild(new Sprite(this, 400, 300, 'logo'));
 
         });
+    }
+
+    update ()
+    {
     }
 }
 
@@ -52,7 +56,8 @@ export default function ()
 
         console.log('click');
 
-        game.scenes.duplicate('gridScene', 'gridScene' + i);
+        game.scenes.start('image', 'gridScene');
+        // game.scenes.spawn('gridScene', 'gridScene' + i);
 
         i++;
 
