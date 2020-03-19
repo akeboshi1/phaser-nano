@@ -18,6 +18,7 @@ export default class Game extends EventEmitter
     scenes: SceneManager;
     textures: TextureManager;
     renderer: WebGLRenderer;
+    // cache
 
     private lastTick: number;
     lifetime: number = 0;
@@ -76,9 +77,9 @@ export default class Game extends EventEmitter
         this.textures = new TextureManager(this);
         this.scenes = new SceneManager(this);
 
-        this.scenes.boot([].concat(config.scene));
-
         this.banner(this.VERSION);
+
+        this.scenes.boot([].concat(config.scene));
 
         //  Visibility API
         document.addEventListener('visibilitychange', () => {

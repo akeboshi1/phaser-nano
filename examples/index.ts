@@ -28,14 +28,14 @@
 // import demo28 from './demo28'; // Mouse Input - Polygon hit area
 // import demo29 from './demo29'; // Rotating items
 // import demo30 from './demo30'; // PNG import via Rollup images plugin
-import demo31 from './demo31'; // Loader using a base64 png
+// import demo31 from './demo31'; // Scene Manager Test
+import demo32 from './demo32'; // New Loader test
 
-demo31();
+demo32();
 
 //  Next steps:
 
 //  * Camera moving needs to dirty the renderer
-//  * Base64 Loader Test
 //  * Load json / csv / xml on their own
 //  * Camera tint + alpha (as shader uniform)
 //  * Camera background color (instead of renderer bgc)
@@ -46,6 +46,7 @@ demo31();
 
 //  Done:
 
+//  X Base64 Loader Test
 //  X Input point translation
 //  X Static Batch shader (Sprite Buffer)
 //  X Texture Atlas Loader

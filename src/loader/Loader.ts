@@ -1,6 +1,5 @@
 import File from './File';
 import Game from '../Game';
-import IFrameConfig from '../textures/IFrameConfig';
 
 export default class Loader
 {
@@ -8,14 +7,15 @@ export default class Loader
 
     baseURL: string = '';
     path: string = '';
-    crossOrigin: string | undefined = undefined;
+    crossOrigin: string = 'anonymous';
 
-    maxParallelDownloads: number = 32;
+    //  -1 means load everything at once
+    maxParallelDownloads: number = -1;
 
     isLoading: boolean = false;
 
-    queue: File[];
-    inflight: Map<string, File>;
+    queue: Set<File>;
+    inflight: Set<File>;
 
     onComplete: Function;
 
@@ -29,8 +29,22 @@ export default class Loader
     reset ()
     {
         this.isLoading = false;
-        this.queue = [];
-        this.inflight = new Map();
+
+        this.queue = new Set();
+        this.inflight = new Set();
+    }
+
+    add (...file: File[])
+    {
+        file.forEach((entity) => {
+
+            entity.loader = this;
+
+            this.queue.add(entity);
+    
+        });
+
+        return this;
     }
 
     start (onComplete: Function)
@@ -40,9 +54,7 @@ export default class Loader
             return;
         }
 
-        // console.log('Loader.start', this.totalFilesToLoad());
-
-        if (this.queue.length > 0)
+        if (this.queue.size > 0)
         {
             this.isLoading = true;
 
@@ -58,20 +70,33 @@ export default class Loader
 
     nextFile ()
     {
-        // let total: number = this.inflight.size;
+        let limit = this.queue.size;
 
-        let total = this.queue.length;
-
-        if (total)
+        if (this.maxParallelDownloads !== -1)
         {
-            //  One at a time ...
-            let file = this.queue.shift();
+            limit = Math.min(limit, this.maxParallelDownloads) - this.inflight.size;
+        }
 
-            this.inflight.set(file.url, file);
+        if (limit)
+        {
+            // console.log('Batching', limit, 'files to download');
 
-            // console.log('Loader.nextFile', file.key, file.url);
+            const iterator = this.queue.values();
 
-            file.loadHandler(file);
+            while (limit > 0)
+            {
+                const file = iterator.next().value;
+
+                // console.log('Loader.nextFile', file.key, '=>', file.url);
+    
+                this.inflight.add(file);
+    
+                this.queue.delete(file);
+    
+                file.load().then((file: File) => this.fileComplete(file)).catch((file: File) => this.fileError(file));
+
+                limit--;
+            }
         }
         else if (this.inflight.size === 0)
         {
@@ -89,6 +114,7 @@ export default class Loader
     fileComplete (file: File)
     {
         //  Link file?
+        /*
         if (file.linkFile && file.linkFile.hasLoaded)
         {
             const imageFile = (file.type === 'atlasimage') ? file : file.linkFile;
@@ -96,45 +122,26 @@ export default class Loader
 
             this.game.textures.addAtlas(file.key, imageFile.data, jsonFile.data);
         }
+        */
 
-        this.inflight.delete(file.url);
+        this.inflight.delete(file);
 
         this.nextFile();
     }
 
     fileError (file: File)
     {
-        this.inflight.delete(file.url);
+        this.inflight.delete(file);
 
         this.nextFile();
     }
 
     totalFilesToLoad (): number
     {
-        return this.queue.length + this.inflight.size;
+        return this.queue.size + this.inflight.size;
     }
 
     /*
-    image (key: string, url?: string)
-    {
-        let file = new File('image', key, this.getURL(key, url, '.png'), (file: File) => this.imageTagLoader(file));
-
-        this.queue.push(file);
-
-        return this;
-    }
-
-    spritesheet (key: string, url: string, frameConfig: IFrameConfig)
-    {
-        let file = new File('spritesheet', key, this.getURL(key, url, '.png'), (file: File) => this.imageTagLoader(file));
-
-        file.config = frameConfig;
-
-        this.queue.push(file);
-
-        return this;
-    }
-
     atlas (key: string, textureURL?: string, atlasURL?: string)
     {
         let textureFile = new File('atlasimage', key, this.getURL(key, textureURL, '.png'), (file: File) => this.imageTagLoader(file));
@@ -150,151 +157,9 @@ export default class Loader
 
         return this;
     }
-
-    json (key: string, url?: string)
-    {
-        let file = new File('json', key, this.getURL(key, url, '.json'), (file: File) => this.XHRLoader(file));
-
-        file.config = { responseType: 'text' };
-
-        this.queue.push(file);
-
-        return this;
-    }
-
-    csv (key: string, url?: string)
-    {
-        let file = new File('csv', key, this.getURL(key, url, '.csv'), (file: File) => this.XHRLoader(file));
-
-        file.config = { responseType: 'text' };
-
-        this.queue.push(file);
-
-        return this;
-    }
     */
 
-    XHRLoader (file: File)
-    {
-        const xhr = new XMLHttpRequest();
-
-        xhr.open('GET', file.url, true);
-
-        xhr.responseType = file.config['responseType'];
-
-        xhr.onload = (event: ProgressEvent) => {
-
-            file.hasLoaded = true;
-
-            if (file.type === 'json' || file.type === 'atlasjson')
-            {
-                file.data = JSON.parse(xhr.responseText);
-            }
-            else
-            {
-                file.data = xhr.responseText;
-            }
-
-            this.fileComplete(file);
-
-        };
-
-        xhr.onerror = () => {
-
-            file.hasLoaded = true;
-
-            this.fileError(file);
-
-        };
-
-        xhr.send();
-    }
-
-    imageTagLoader (file: File)
-    {
-        // console.log('Loader.imageTagLoader', file.key);
-        // console.log(this);
-
-        file.data = new Image();
-
-        if (this.crossOrigin)
-        {
-            file.data.crossOrigin = this.crossOrigin;
-        }
-
-        file.data.onload = () => {
-
-            // console.log('File.data.onload', file.key);
-
-            file.data.onload = null;
-            file.data.onerror = null;
-            file.hasLoaded = true;
-
-            if (file.type === 'image')
-            {
-                this.game.textures.addImage(file.key, file.data);
-            }
-            else if (file.type === 'spritesheet')
-            {
-                this.game.textures.addSpriteSheet(file.key, file.data, file.config);
-            }
-
-            this.fileComplete(file);
-
-        };
-
-        file.data.onerror = () => {
-
-            // console.log('File.data.onerror', file.key);
-
-            file.data.onload = null;
-            file.data.onerror = null;
-            file.hasLoaded = true;
-
-            this.fileError(file);
-
-        };
-
-        file.data.src = file.url;
-
-        //  Image is cached / available immediately
-        if (file.data.complete && file.data.width && file.data.height)
-        {
-            file.data.onload = null;
-            file.data.onerror = null;
-            file.hasLoaded = true;
-
-            if (file.type === 'image')
-            {
-                this.game.textures.addImage(file.key, file.data);
-            }
-            else if (file.type === 'spritesheet')
-            {
-                this.game.textures.addSpriteSheet(file.key, file.data, file.config);
-            }
-
-            this.fileComplete(file);
-        }
-    }
-
-    getURL (key: string, url: string, extension: string)
-    {
-        if (!url)
-        {
-            url = key + extension;
-        }
-
-        if (url.match(/^(?:blob:|data:|http:\/\/|https:\/\/|\/\/)/))
-        {
-            return url;
-        }
-        else
-        {
-            return this.baseURL + this.path + url;
-        }
-    }
-
-    setBaseURL (url: string)
+    setBaseURL (url: string = ''): this
     {
         if (url !== '' && url.substr(-1) !== '/')
         {
@@ -306,7 +171,7 @@ export default class Loader
         return this;
     }
 
-    setPath (path: string)
+    setPath (path: string = ''): this
     {
         if (path !== '' && path.substr(-1) !== '/')
         {
@@ -318,11 +183,17 @@ export default class Loader
         return this;
     }
 
-    setCORS (crossOrigin)
+    setCORS (crossOrigin: string): this
     {
         this.crossOrigin = crossOrigin;
 
         return this;
     }
 
+    setMaxParallelDownloads (max: number): this
+    {
+        this.maxParallelDownloads = max;
+
+        return this;
+    }
 }

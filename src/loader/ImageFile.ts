@@ -1,26 +1,37 @@
 import File from './File';
 import ImageTagLoader from './ImageTagLoader';
-import Texture from '../textures/Texture';
 import Game from '../Game';
 import GetURL from './GetURL';
 
-export default function ImageFile (game: Game, key: string, url?: string): Promise<Texture>
+export default function ImageFile (game: Game, key: string, url?: string): File
 {
-    const file = new File(key, GetURL(key, url, '.png'));
+    const file = new File(key, url);
 
-    return new Promise(
-        (resolve, reject) => {
+    file.load = () => {
 
-            ImageTagLoader(file).then(file => {
+        file.url = GetURL(file.key, file.url, '.png', file.loader);
 
-                resolve(game.textures.add(key, file.data));
-    
-            }).catch(file => {
+        // console.log('load called on', file.url);
 
-                reject(null);
-    
-            });
+        return new Promise(
+            (resolve, reject) => {
 
-        }
-    );
+                ImageTagLoader(file).then(file => {
+
+                    // console.log('ImageFile resolved');
+
+                    game.textures.add(key, file.data);
+
+                    resolve(file);
+        
+                }).catch(file => {
+
+                    reject(file);
+
+                });
+            }
+        );
+    };
+
+    return file;
 }

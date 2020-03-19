@@ -5,5 +5,5 @@ export default interface IGameConfig {
     height?: number;
     parent?: string | HTMLElement;
     backgroundColor?: number;
-    scene?: IScene | IScene[] | any[];
+    scene?: IScene | IScene[] | any | any[];
 }

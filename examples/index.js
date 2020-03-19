@@ -1702,8 +1702,8 @@ void main (void)
             this.renderer = renderer;
             this.textures = new TextureManager(this);
             this.scenes = new SceneManager(this);
-            this.scenes.boot([].concat(config.scene));
             this.banner(this.VERSION);
+            this.scenes.boot([].concat(config.scene));
             //  Visibility API
             document.addEventListener('visibilitychange', () => {
                 this.emit('visibilitychange', document.hidden);
@@ -1875,14 +1875,12 @@ void main (void)
     */
 
     class File {
-        // constructor (type: string, key: string, url: string, loadHandler: Function, config?: any)
         constructor(key, url, config) {
+            this.responseType = 'text';
             this.crossOrigin = undefined;
             this.hasLoaded = false;
-            // this.type = type;
             this.key = key;
             this.url = url;
-            // this.loadHandler = loadHandler;
             this.config = config;
         }
     }
@@ -1918,7 +1916,7 @@ void main (void)
         });
     }
 
-    function GetURL(key, url, extension) {
+    function GetURL(key, url, extension, loader) {
         if (!url) {
             url = key + extension;
         }
@@ -1926,100 +1924,190 @@ void main (void)
             return url;
         }
         else {
-            // return this.baseURL + this.path + url;
-            return url;
+            if (loader) {
+                return loader.baseURL + loader.path + url;
+            }
+            else {
+                return url;
+            }
         }
     }
 
     function ImageFile(game, key, url) {
-        const file = new File(key, GetURL(key, url, '.png'));
-        return new Promise((resolve, reject) => {
-            ImageTagLoader(file).then(file => {
-                resolve(game.textures.add(key, file.data));
-            }).catch(file => {
-                reject(null);
+        const file = new File(key, url);
+        file.load = () => {
+            file.url = GetURL(file.key, file.url, '.png', file.loader);
+            // console.log('load called on', file.url);
+            return new Promise((resolve, reject) => {
+                ImageTagLoader(file).then(file => {
+                    // console.log('ImageFile resolved');
+                    game.textures.add(key, file.data);
+                    resolve(file);
+                }).catch(file => {
+                    reject(file);
+                });
             });
-        });
+        };
+        return file;
     }
 
-    function CreateCanvas(width, height) {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        return canvas.getContext('2d');
-    }
-
-    function GridTexture(color1, color2, width = 32, height = 32, cols = 2, rows = 2) {
-        let texture = null;
-        const ctx = CreateCanvas(width, height);
-        const colWidth = width / cols;
-        const rowHeight = height / rows;
-        ctx.fillStyle = color1;
-        ctx.fillRect(0, 0, width, height);
-        ctx.fillStyle = color2;
-        for (let y = 0; y < rows; y++) {
-            for (let x = (y % 2); x < cols; x += 2) {
-                ctx.fillRect(x * colWidth, y * rowHeight, colWidth, rowHeight);
+    class Loader {
+        constructor(game) {
+            this.baseURL = '';
+            this.path = '';
+            this.crossOrigin = 'anonymous';
+            //  -1 means load everything at once
+            this.maxParallelDownloads = -1;
+            this.isLoading = false;
+            this.game = game;
+            this.reset();
+        }
+        reset() {
+            this.isLoading = false;
+            this.queue = new Set();
+            this.inflight = new Set();
+        }
+        add(...file) {
+            file.forEach((entity) => {
+                entity.loader = this;
+                this.queue.add(entity);
+            });
+            return this;
+        }
+        start(onComplete) {
+            if (this.isLoading) {
+                return;
+            }
+            if (this.queue.size > 0) {
+                this.isLoading = true;
+                this.onComplete = onComplete;
+                this.nextFile();
+            }
+            else {
+                onComplete();
             }
         }
-        return texture = new Texture('', ctx.canvas);
+        nextFile() {
+            let limit = this.queue.size;
+            if (this.maxParallelDownloads !== -1) {
+                limit = Math.min(limit, this.maxParallelDownloads) - this.inflight.size;
+            }
+            if (limit) {
+                // console.log('Batching', limit, 'files to download');
+                const iterator = this.queue.values();
+                while (limit > 0) {
+                    const file = iterator.next().value;
+                    // console.log('Loader.nextFile', file.key, '=>', file.url);
+                    this.inflight.add(file);
+                    this.queue.delete(file);
+                    file.load().then((file) => this.fileComplete(file)).catch((file) => this.fileError(file));
+                    limit--;
+                }
+            }
+            else if (this.inflight.size === 0) {
+                this.stop();
+            }
+        }
+        stop() {
+            this.isLoading = false;
+            this.onComplete();
+        }
+        fileComplete(file) {
+            //  Link file?
+            /*
+            if (file.linkFile && file.linkFile.hasLoaded)
+            {
+                const imageFile = (file.type === 'atlasimage') ? file : file.linkFile;
+                const jsonFile = (file.type === 'atlasjson') ? file : file.linkFile;
+
+                this.game.textures.addAtlas(file.key, imageFile.data, jsonFile.data);
+            }
+            */
+            this.inflight.delete(file);
+            this.nextFile();
+        }
+        fileError(file) {
+            this.inflight.delete(file);
+            this.nextFile();
+        }
+        totalFilesToLoad() {
+            return this.queue.size + this.inflight.size;
+        }
+        /*
+        atlas (key: string, textureURL?: string, atlasURL?: string)
+        {
+            let textureFile = new File('atlasimage', key, this.getURL(key, textureURL, '.png'), (file: File) => this.imageTagLoader(file));
+            let JSONFile = new File('atlasjson', key, this.getURL(key, atlasURL, '.json'), (file: File) => this.XHRLoader(file));
+
+            JSONFile.config = { responseType: 'text' };
+
+            textureFile.linkFile = JSONFile;
+            JSONFile.linkFile = textureFile;
+
+            this.queue.push(textureFile);
+            this.queue.push(JSONFile);
+
+            return this;
+        }
+        */
+        setBaseURL(url = '') {
+            if (url !== '' && url.substr(-1) !== '/') {
+                url = url.concat('/');
+            }
+            this.baseURL = url;
+            return this;
+        }
+        setPath(path = '') {
+            if (path !== '' && path.substr(-1) !== '/') {
+                path = path.concat('/');
+            }
+            this.path = path;
+            return this;
+        }
+        setCORS(crossOrigin) {
+            this.crossOrigin = crossOrigin;
+            return this;
+        }
+        setMaxParallelDownloads(max) {
+            this.maxParallelDownloads = max;
+            return this;
+        }
     }
 
     class Demo extends Scene {
         constructor(game) {
-            super(game, 'gridScene');
-            if (!this.game.textures.has('grid')) {
-                this.game.textures.add('grid', GridTexture('#ff0000', '#00ff00', 64, 64, 4, 4));
-            }
-            const x = Math.random() * 800;
-            const y = Math.random() * 600;
-            this.world.addChild(new Sprite(this, x, y, 'grid'));
+            super(game);
+            const loader = new Loader(game);
+            loader.setPath('assets');
+            // loader.add(ImageFile(game, 'star', 'star.png'));
+            // loader.add(ImageFile(game, 'clown', 'clown.png'));
+            // loader.add(ImageFile(game, 'logo', 'logo.png'));
+            loader.add(ImageFile(game, 'star', 'star.png'), ImageFile(game, 'clown', 'clown.png'), ImageFile(game, 'logo', 'logo.png'));
+            loader.start(() => this.create());
+        }
+        create() {
+            const sprite1 = new Sprite(this, 400, 300, 'logo');
+            const sprite2 = new Sprite(this, 400, 300, 'star');
+            const sprite3 = new Sprite(this, 400, 50, 'clown');
+            this.game.scenes.flush = true;
+            this.world.addChild(sprite1, sprite2, sprite3);
         }
     }
-    class Demo2 extends Scene {
-        constructor(game) {
-            super(game, { key: 'image', active: false });
-            if (!this.game.textures.has('star')) {
-                ImageFile(game, 'star', 'assets/star.png').then(() => this.addStar());
-            }
-            else {
-                this.addStar();
-            }
-        }
-        addStar() {
-            const x = Math.random() * 800;
-            const y = Math.random() * 600;
-            this.star = new Sprite(this, x, y, 'star');
-            this.world.addChild(this.star);
-            this.game.scenes.wake(this);
-        }
-        update() {
-            this.star.rotation += 0.01;
-        }
-    }
-    function demo31 () {
+    function demo32 () {
         const game = new Game({
             width: 800,
             height: 600,
             backgroundColor: 0x000033,
             parent: 'gameParent',
-            scene: [Demo, Demo2]
+            scene: Demo
         });
         window['game'] = game;
-        let i = 0;
-        window.addEventListener('click', () => {
-            // game.scenes.start('image', 'gridScene');
-            // game.scenes.spawn('gridScene', 'gridScene' + i);
-            game.scenes.spawn('image', 'image' + i, false);
-            i++;
-        });
     }
 
     // import demo1 from './demo1'; // test single sprite
-    demo31();
+    demo32();
     //  Next steps:
     //  * Camera moving needs to dirty the renderer
-    //  * Base64 Loader Test
     //  * Load json / csv / xml on their own
     //  * Camera tint + alpha (as shader uniform)
     //  * Camera background color (instead of renderer bgc)
@@ -2028,6 +2116,7 @@ void main (void)
     //  * Tile Layer
     //  * Instead of a Quad class, try a class that can have any number of vertices in it (ala Rope), or any vertex moved
     //  Done:
+    //  X Base64 Loader Test
     //  X Input point translation
     //  X Static Batch shader (Sprite Buffer)
     //  X Texture Atlas Loader
