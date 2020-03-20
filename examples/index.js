@@ -1893,60 +1893,6 @@ void main (void)
         }
     }
 
-    function XHRLoader(file) {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', file.url, true);
-        xhr.responseType = file.responseType;
-        return new Promise((resolve, reject) => {
-            xhr.onload = () => {
-                file.data = xhr.responseText;
-                file.hasLoaded = true;
-                resolve(file);
-            };
-            xhr.onerror = () => {
-                file.hasLoaded = true;
-                reject(file);
-            };
-            xhr.send();
-        });
-    }
-
-    function GetURL(key, url, extension, loader) {
-        if (!url) {
-            url = key + extension;
-        }
-        if (url.match(/^(?:blob:|data:|http:\/\/|https:\/\/|\/\/)/)) {
-            return url;
-        }
-        else {
-            if (loader) {
-                return loader.baseURL + loader.path + url;
-            }
-            else {
-                return url;
-            }
-        }
-    }
-
-    function JSONFile(game, key, url) {
-        const file = new File(key, url);
-        file.load = () => {
-            file.url = GetURL(file.key, file.url, '.json', file.loader);
-            return new Promise((resolve, reject) => {
-                XHRLoader(file).then(file => {
-                    file.data = JSON.parse(file.data);
-                    if (!file.skipCache) {
-                        game.cache.json.set(file.key, file.data);
-                    }
-                    resolve(file);
-                }).catch(file => {
-                    reject(file);
-                });
-            });
-        };
-        return file;
-    }
-
     function ImageTagLoader(file) {
         file.data = new Image();
         if (file.crossOrigin) {
@@ -1978,6 +1924,23 @@ void main (void)
         });
     }
 
+    function GetURL(key, url, extension, loader) {
+        if (!url) {
+            url = key + extension;
+        }
+        if (url.match(/^(?:blob:|data:|http:\/\/|https:\/\/|\/\/)/)) {
+            return url;
+        }
+        else {
+            if (loader) {
+                return loader.baseURL + loader.path + url;
+            }
+            else {
+                return url;
+            }
+        }
+    }
+
     function ImageFile(game, key, url) {
         const file = new File(key, url);
         file.load = () => {
@@ -1997,72 +1960,9 @@ void main (void)
         return file;
     }
 
-    function AtlasParser (texture, data) {
-        let frames;
-        if (Array.isArray(data.textures)) {
-            //  TP3 Format
-            frames = data.textures[0].frames;
-        }
-        else if (Array.isArray(data.frames)) {
-            //  TP2 Format Array
-            frames = data.frames;
-        }
-        else if (data.hasOwnProperty('frames')) {
-            //  TP2 Format Hash
-            frames = Object.values(data.frames);
-        }
-        else {
-            console.warn('Invalid Texture Atlas JSON');
-        }
-        if (frames) {
-            let newFrame;
-            for (let i = 0; i < frames.length; i++) {
-                let src = frames[i];
-                //  The frame values are the exact coordinates to cut the frame out of the atlas from
-                newFrame = texture.add(src.filename, src.frame.x, src.frame.y, src.frame.w, src.frame.h);
-                //  These are the original (non-trimmed) sprite values
-                if (src.trimmed) {
-                    newFrame.setTrim(src.sourceSize.w, src.sourceSize.h, src.spriteSourceSize.x, src.spriteSourceSize.y, src.spriteSourceSize.w, src.spriteSourceSize.h);
-                }
-                else {
-                    newFrame.setSourceSize(src.sourceSize.w, src.sourceSize.h);
-                }
-                if (src.rotated) ;
-                if (src.anchor) {
-                    newFrame.setPivot(src.anchor.x, src.anchor.y);
-                }
-            }
-        }
-    }
-
-    function AtlasFile(game, key, textureURL, atlasURL) {
-        const json = JSONFile(game, key, atlasURL);
-        const image = ImageFile(game, key, textureURL);
-        const file = new File(key, '');
-        file.load = () => {
-            //  If called via a Loader, it has been set into the file const
-            json.url = GetURL(json.key, json.url, '.json', file.loader);
-            image.url = GetURL(image.key, image.url, '.png', file.loader);
-            return new Promise((resolve, reject) => {
-                json.skipCache = true;
-                json.load().then(() => {
-                    image.load().then(() => {
-                        //  By this stage, the JSON and image are loaded and in the texture manager
-                        AtlasParser(game.textures.get(key), json.data);
-                        resolve(file);
-                    }).catch(() => {
-                        reject(file);
-                    });
-                }).catch(() => {
-                    reject(file);
-                });
-            });
-        };
-        return file;
-    }
-
-    class Loader {
+    class Loader extends EventEmitter {
         constructor(game) {
+            super();
             this.baseURL = '';
             this.path = '';
             this.crossOrigin = 'anonymous';
@@ -2076,9 +1976,11 @@ void main (void)
             this.isLoading = false;
             this.queue = new Set();
             this.inflight = new Set();
+            this.completed = new Set();
+            this.progress = 0;
         }
         add(...file) {
-            file.forEach((entity) => {
+            file.forEach(entity => {
                 entity.loader = this;
                 this.queue.add(entity);
             });
@@ -2088,14 +1990,20 @@ void main (void)
             if (this.isLoading) {
                 return;
             }
+            this.completed.clear();
+            this.progress = 0;
             if (this.queue.size > 0) {
                 this.isLoading = true;
                 this.onComplete = onComplete;
+                this.emit('start');
                 this.nextFile();
             }
             else {
+                this.progress = 1;
+                this.emit('complete');
                 onComplete();
             }
+            return this;
         }
         nextFile() {
             let limit = this.queue.size;
@@ -2120,15 +2028,27 @@ void main (void)
         }
         stop() {
             this.isLoading = false;
+            this.emit('complete');
             this.onComplete();
         }
-        fileComplete(file) {
+        updateProgress(file) {
             this.inflight.delete(file);
+            this.completed.add(file);
+            const totalCompleted = this.completed.size;
+            const totalQueued = this.queue.size + this.inflight.size;
+            if (totalCompleted > 0) {
+                this.progress = totalCompleted / (totalCompleted + totalQueued);
+            }
+            this.emit('progress', this.progress, totalCompleted, totalQueued);
             this.nextFile();
         }
+        fileComplete(file) {
+            this.emit('filecomplete', file);
+            this.updateProgress(file);
+        }
         fileError(file) {
-            this.inflight.delete(file);
-            this.nextFile();
+            this.emit('fileerror', file);
+            this.updateProgress(file);
         }
         totalFilesToLoad() {
             return this.queue.size + this.inflight.size;
@@ -2160,28 +2080,24 @@ void main (void)
     class Demo extends Scene {
         constructor(game) {
             super(game);
-            this.dx = 1;
             const loader = new Loader(game);
             loader.setPath('assets');
-            // loader.add(AtlasFile(game, 'test', 'atlas-notrim.png', 'atlas-notrim.json'));
-            loader.add(AtlasFile(game, 'test', 'atlas-trimmed.png', 'atlas-trimmed.json'));
+            loader.add(ImageFile(game, '1x1'), ImageFile(game, '2x2'), ImageFile(game, '4x4'), ImageFile(game, '8x8'), ImageFile(game, '32x32'), ImageFile(game, '128x128'), ImageFile(game, '512x512'), ImageFile(game, 'ayu'), ImageFile(game, 'balls'), ImageFile(game, 'beball1'), ImageFile(game, 'box-item-boxed'), ImageFile(game, 'brain'), ImageFile(game, 'bubble256'), ImageFile(game, 'bubbles-background'), ImageFile(game, 'car'), ImageFile(game, 'carrot'), ImageFile(game, 'checker'), ImageFile(game, 'clown'), ImageFile(game, 'hotdog'), ImageFile(game, 'lance-overdose-loader-eye'), ImageFile(game, 'lemming'), ImageFile(game, 'logo'), ImageFile(game, 'mushroom-32x32'), ImageFile(game, 'muzzleflash2'), ImageFile(game, 'orange-cat1'), ImageFile(game, 'orb-blue'), ImageFile(game, 'orb-red'), ImageFile(game, 'pacman_by_oz_28x28'), ImageFile(game, 'phaser-ship'), ImageFile(game, 'phaser_tiny'), ImageFile(game, 'red'), ImageFile(game, 'rocket'), ImageFile(game, 'shinyball'), ImageFile(game, 'skull'), ImageFile(game, 'sonic'), ImageFile(game, 'star'), ImageFile(game, 'terrain2'), ImageFile(game, 'uv-grid-diag'));
+            loader.setMaxParallelDownloads(1);
+            loader.on('progress', (progress, totalCompleted, totalQueued) => {
+                console.log(progress, ' - (' + totalCompleted + ' / ' + totalQueued + ')');
+            });
             loader.start(() => this.create());
         }
         create() {
-            const sprite1 = new Sprite(this, 400, 300, 'test', 'ayu');
-            const sprite2 = new Sprite(this, 400, 300, 'test', 'hello');
-            const sprite3 = new Sprite(this, 400, 50, 'test', 'brain');
+            const sprite1 = new Sprite(this, 400, 300, 'logo');
+            const sprite2 = new Sprite(this, 400, 300, 'star');
+            const sprite3 = new Sprite(this, 400, 50, 'clown');
+            this.game.scenes.flush = true;
             this.world.addChild(sprite1, sprite2, sprite3);
-            window['scene'] = this;
-        }
-        update() {
-            this.world.camera.x += this.dx;
-            if (this.world.camera.x < -300 || this.world.camera.x > 300) {
-                this.dx *= -1;
-            }
         }
     }
-    function demo33 () {
+    function demo34 () {
         const game = new Game({
             width: 800,
             height: 600,
@@ -2189,10 +2105,11 @@ void main (void)
             parent: 'gameParent',
             scene: Demo
         });
+        window['game'] = game;
     }
 
     // import demo1 from './demo1'; // test single sprite
-    demo33();
+    demo34();
     //  Next steps:
     //  * Camera tint + alpha (as shader uniform)
     //  * Camera background color (instead of renderer bgc)

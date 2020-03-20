@@ -30,9 +30,10 @@
 // import demo30 from './demo30'; // PNG import via Rollup images plugin
 // import demo31 from './demo31'; // Scene Manager Test
 // import demo32 from './demo32'; // New Loader test
-import demo33 from './demo33'; // AtlasFile test
+// import demo33 from './demo33'; // AtlasFile test
+import demo34 from './demo34'; // Loader Progress test
 
-demo33();
+demo34();
 
 //  Next steps:
 

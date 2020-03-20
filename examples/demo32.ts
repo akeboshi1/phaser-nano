@@ -1,7 +1,7 @@
 import Game from '../src/Game';
 import Scene from '../src/Scene';
 import Sprite from '../src/gameobjects/Sprite';
-import ImageFile from '../src/loader/ImageFile';
+import ImageFile from '../src/loader/files/ImageFile';
 import Loader from '../src/loader/Loader';
 
 class Demo extends Scene
