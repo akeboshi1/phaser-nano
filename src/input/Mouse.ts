@@ -1,11 +1,8 @@
 import EventEmitter from '../core/EventEmitter';
 import Vec2 from '../math/Vec2';
-// import { Container } from './Container';
-// import Sprite from './Sprite';
 import GlobalToLocal from '../math/GlobalToLocal';
 import IMatrix2d from '../math/IMatrix2d';
 import AppendMatrix2d from '../math/AppendMatrix2d';
-// import DisplayObjectContainer from './DisplayObjectContainer';
 
 export default class Mouse extends EventEmitter
 {
