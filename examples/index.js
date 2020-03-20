@@ -1727,7 +1727,7 @@ void main (void)
             requestAnimationFrame(() => this.step());
         }
         banner(version) {
-            console.log('%c  %cPhaser Nano v' + version + '%c https://phaser4.io', 'padding: 2px; background: linear-gradient(to right, #00bcc3, #3e0081)', 'padding: 2px 20px 2px 8px; color: #fff; background: linear-gradient(to right, #3e0081 90%, #3e0081 10%, #00bcc3)', '');
+            console.log('%c %cPhaser Nano v' + version + '%c https://phaser4.io', 'padding: 2px; background: linear-gradient(to right, #00bcc3, #3e0081)', 'padding: 2px 20px 2px 8px; color: #fff; background: linear-gradient(to right, #3e0081 90%, #3e0081 10%, #00bcc3)', '');
             //  Adds ~400 bytes to build size :(
             // console.log(
             //     '%c  %c  %cPhaser Nano v' + version + '%c https://phaser4.io',

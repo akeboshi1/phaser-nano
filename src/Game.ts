@@ -114,7 +114,7 @@ export default class Game extends EventEmitter
     banner (version: string)
     {
         console.log(
-            '%c  %cPhaser Nano v' + version + '%c https://phaser4.io',
+            '%c %cPhaser Nano v' + version + '%c https://phaser4.io',
             'padding: 2px; background: linear-gradient(to right, #00bcc3, #3e0081)',
             'padding: 2px 20px 2px 8px; color: #fff; background: linear-gradient(to right, #3e0081 90%, #3e0081 10%, #00bcc3)',
             ''
