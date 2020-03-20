@@ -3,6 +3,8 @@ import Vec2 from '../math/Vec2';
 import GlobalToLocal from '../math/GlobalToLocal';
 import IMatrix2d from '../math/IMatrix2d';
 import AppendMatrix2d from '../math/AppendMatrix2d';
+import { IInputComponent, IContainerComponent } from '../components';
+import IGameObject from '../gameobjects/IGameObject';
 
 export default class Mouse extends EventEmitter
 {
@@ -102,27 +104,27 @@ export default class Mouse extends EventEmitter
         return local;
     }
 
-    getInteractiveChildren (parent: DisplayObjectContainer, results: DisplayObjectContainer[])
+    getInteractiveChildren (parent: IGameObject & IContainerComponent, results: IGameObject[])
     {
         const children = parent.children;
 
         for (let i = 0; i < children.length; i++)
         {
-            let child = children[i];
+            let child = children[i] as IGameObject;
 
             if (child.visible && child.inputEnabled)
             {
-                results.push(child as DisplayObjectContainer);
+                results.push(child);
             }
 
-            if (child.inputEnabledChildren && child.size > 0)
+            if (child.inputEnabledChildren && child.isParent)
             {
-                this.getInteractiveChildren(child as DisplayObjectContainer, results);
+                this.getInteractiveChildren(child as IGameObject & IContainerComponent, results);
             }
         }
     }
 
-    checkHitArea (entity: DisplayObjectContainer, px: number, py: number): boolean
+    checkHitArea (entity: IGameObject, px: number, py: number): boolean
     {
         if (entity.inputHitArea)
         {
@@ -144,7 +146,7 @@ export default class Mouse extends EventEmitter
         return false;
     }
 
-    hitTest (...entities: DisplayObjectContainer[]): boolean
+    hitTest (...entities: IGameObject[]): boolean
     {
         const localX = this.localPoint.x;
         const localY = this.localPoint.y;
@@ -154,7 +156,7 @@ export default class Mouse extends EventEmitter
         {
             let entity = entities[i];
 
-            let mat = AppendMatrix2d(entity.scene.camera.worldTransform, entity.worldTransform);
+            let mat = AppendMatrix2d(entity.scene.world.camera.worldTransform, entity.worldTransform);
 
             GlobalToLocal(mat, localX, localY, point);
 
@@ -168,7 +170,7 @@ export default class Mouse extends EventEmitter
         return false;
     }
 
-    hitTestChildren (container: DisplayObjectContainer, topOnly: boolean = true): DisplayObjectContainer[]
+    hitTestChildren (container: IGameObject & IContainerComponent, topOnly: boolean = true): IGameObject[]
     {
         const output = [];
 
@@ -178,23 +180,17 @@ export default class Mouse extends EventEmitter
         }
 
         //  Build a list of potential input candidates
-        const candidates: DisplayObjectContainer[] = [];
+        const candidates: IGameObject[] = [];
 
         if (container.inputEnabled)
         {
             candidates.push(container);
         }
 
-        if (container.inputEnabledChildren && container.size > 0)
+        if (container.inputEnabledChildren && container.numChildren > 0)
         {
             this.getInteractiveChildren(container, candidates);
         }
-
-        // const camera = container.scene.camera;
-
-        // const localX = this.localPoint.x;
-        // const localY = this.localPoint.y;
-        // const point = this.transPoint;
 
         for (let i: number = candidates.length - 1; i >= 0; i--)
         {
@@ -212,45 +208,5 @@ export default class Mouse extends EventEmitter
         }
 
         return output;
-
-            /*
-            let mat = AppendMatrix2d(camera.worldTransform, entity.worldTransform);
-
-            GlobalToLocal(mat, localX, localY, point);
-
-            let px = point.x;
-            let py = point.y;
-        
-            if (entity.inputHitArea)
-            {
-                if (entity.inputHitArea.contains(px, py))
-                {
-                    output.push(entity);
-
-                    if (topOnly)
-                    {
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                const left: number = -(entity.width * entity.originX);
-                const right: number = left + entity.width;
-                const top: number = -(entity.height * entity.originY);
-                const bottom: number = top + entity.height;
-        
-                if (px >= left && px <= right && py >= top && py <= bottom)
-                {
-                    output.push(entity);
-
-                    if (topOnly)
-                    {
-                        break;
-                    }
-                }
-            }
-            */
     }
-
 }
