@@ -20,6 +20,8 @@ export default function AtlasFile (game: Game, key: string, textureURL?: string,
 
         return new Promise((resolve, reject) => {
 
+            json.skipCache = true;
+
             json.load().then(() => {
 
                 image.load().then(() => {

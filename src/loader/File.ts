@@ -9,6 +9,7 @@ export default class File
     data: any;
     error: ErrorEvent | undefined;
     config: any;
+    skipCache: boolean = false;
     hasLoaded: boolean = false;
     loader: Loader;
     load: () => Promise<File>;

@@ -17,7 +17,10 @@ export default function JSONFile (game: Game, key: string, url?: string): File
 
                 file.data = JSON.parse(file.data);
 
-                //  game.cache.stuff
+                if (!file.skipCache)
+                {
+                    game.cache.json.set(file.key, file.data);
+                }
 
                 resolve(file);
     

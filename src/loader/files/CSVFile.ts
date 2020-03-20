@@ -15,8 +15,10 @@ export default function CSVFile (game: Game, key: string, url?: string): File
 
             XHRLoader(file).then(file => {
 
-                // file.data = JSON.parse(file.data);
-                //  game.cache.stuff
+                if (!file.skipCache)
+                {
+                    game.cache.csv.set(file.key, file.data);
+                }
 
                 resolve(file);
     
