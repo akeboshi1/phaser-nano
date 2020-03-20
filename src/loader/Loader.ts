@@ -1,7 +1,8 @@
 import File from './File';
 import Game from '../Game';
+import EventEmitter from '../core/EventEmitter';
 
-export default class Loader
+export default class Loader extends EventEmitter
 {
     game: Game;
 
@@ -13,14 +14,18 @@ export default class Loader
     maxParallelDownloads: number = -1;
 
     isLoading: boolean = false;
+    progress: number;
 
     queue: Set<File>;
     inflight: Set<File>;
+    completed: Set<File>;
 
     onComplete: Function;
 
     constructor (game: Game)
     {
+        super();
+
         this.game = game;
 
         this.reset();
@@ -32,11 +37,14 @@ export default class Loader
 
         this.queue = new Set();
         this.inflight = new Set();
+        this.completed = new Set();
+
+        this.progress = 0;
     }
 
     add (...file: File[]): this
     {
-        file.forEach((entity) => {
+        file.forEach(entity => {
 
             entity.loader = this;
 
@@ -47,12 +55,15 @@ export default class Loader
         return this;
     }
 
-    start (onComplete: Function)
+    start (onComplete: Function): this
     {
         if (this.isLoading)
         {
             return;
         }
+
+        this.completed.clear();
+        this.progress = 0;
 
         if (this.queue.size > 0)
         {
@@ -60,12 +71,20 @@ export default class Loader
 
             this.onComplete = onComplete;
 
+            this.emit('start');
+
             this.nextFile();
         }
         else
         {
+            this.progress = 1;
+
+            this.emit('complete');
+
             onComplete();
         }
+
+        return this;
     }
 
     nextFile ()
@@ -108,21 +127,41 @@ export default class Loader
     {
         this.isLoading = false;
 
+        this.emit('complete');
+
         this.onComplete();
+    }
+
+    private updateProgress (file: File)
+    {
+        this.inflight.delete(file);
+        this.completed.add(file);
+
+        const totalCompleted = this.completed.size;
+        const totalQueued = this.queue.size + this.inflight.size;
+
+        if (totalCompleted > 0)
+        {
+            this.progress = totalCompleted / (totalCompleted + totalQueued);
+        }
+
+        this.emit('progress', this.progress, totalCompleted, totalQueued);
+
+        this.nextFile();
     }
 
     private fileComplete (file: File)
     {
-        this.inflight.delete(file);
+        this.emit('filecomplete', file);
 
-        this.nextFile();
+        this.updateProgress(file);
     }
 
     private fileError (file: File)
     {
-        this.inflight.delete(file);
+        this.emit('fileerror', file);
 
-        this.nextFile();
+        this.updateProgress(file);
     }
 
     totalFilesToLoad (): number
