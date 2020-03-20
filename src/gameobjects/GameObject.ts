@@ -7,6 +7,7 @@ export default class GameObject extends Install(class {}, [
     Components.AlphaComponent,
     Components.DirtyComponent,
     Components.ParentComponent,
+    Components.InputComponent,
     Components.OriginComponent,
     Components.PositionComponent,
     Components.RenderableComponent,

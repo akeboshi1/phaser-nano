@@ -3,6 +3,7 @@ import * as Components from '../components';
 export default interface IGameObject extends
     Components.IAlphaComponent,
     Components.IDirtyComponent,
+    Components.IInputComponent,
     Components.IOriginComponent,
     Components.IParentComponent,
     Components.IPositionComponent,

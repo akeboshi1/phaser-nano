@@ -3,6 +3,7 @@ import * as Components from '../components';
 export default interface ISprite extends
     Components.IContainerComponent,
     Components.IDirtyComponent,
+    Components.IInputComponent,
     Components.IOriginComponent,
     Components.IParentComponent,
     Components.IPositionComponent,
