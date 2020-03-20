@@ -1,7 +1,7 @@
 import Game from '../src/Game';
 import Scene from '../src/Scene';
 import Sprite from '../src/gameobjects/Sprite';
-import AtlasFile from '../src/loader/AtlasFile';
+import AtlasFile from '../src/loader/files/AtlasFile';
 import Loader from '../src/loader/Loader';
 
 class Demo extends Scene

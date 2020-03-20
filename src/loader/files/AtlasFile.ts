@@ -1,9 +1,9 @@
-import File from './File';
+import File from '../File';
 import JSONFile from './JSONFile';
 import ImageFile from './ImageFile';
-import Game from '../Game';
-import AtlasParser from '../textures/AtlasParser';
-import GetURL from './GetURL';
+import Game from '../../Game';
+import AtlasParser from '../../textures/AtlasParser';
+import GetURL from '../GetURL';
 
 export default function AtlasFile (game: Game, key: string, textureURL?: string, atlasURL?: string): File
 {

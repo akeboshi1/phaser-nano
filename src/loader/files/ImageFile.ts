@@ -1,7 +1,7 @@
-import File from './File';
-import ImageTagLoader from './ImageTagLoader';
-import Game from '../Game';
-import GetURL from './GetURL';
+import File from '../File';
+import ImageTagLoader from '../ImageTagLoader';
+import Game from '../../Game';
+import GetURL from '../GetURL';
 
 export default function ImageFile (game: Game, key: string, url?: string): File
 {
@@ -18,19 +18,18 @@ export default function ImageFile (game: Game, key: string, url?: string): File
 
         return new Promise((resolve, reject) => {
 
-                ImageTagLoader(file).then(file => {
+            ImageTagLoader(file).then(file => {
 
-                    game.textures.add(key, file.data);
+                game.textures.add(key, file.data);
 
-                    resolve(file);
-        
-                }).catch(file => {
+                resolve(file);
+    
+            }).catch(file => {
 
-                    reject(file);
+                reject(file);
 
-                });
-            }
-        );
+            });
+        });
     };
 
     return file;
