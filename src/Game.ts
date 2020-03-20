@@ -18,7 +18,7 @@ export default class Game extends EventEmitter
     scenes: SceneManager;
     textures: TextureManager;
     renderer: WebGLRenderer;
-    // cache
+    cache: { json: Map<string, any>; csv: Map<string, any>; xml: Map<string, any>; };
 
     private lastTick: number;
     lifetime: number = 0;
@@ -40,6 +40,12 @@ export default class Game extends EventEmitter
         } = config;
 
         this.config = { width, height, backgroundColor, parent, scene };
+
+        this.cache = {
+            json: new Map(),
+            csv: new Map(),
+            xml: new Map()
+        };
 
         DOMContentLoaded(() => this.boot());
     }
