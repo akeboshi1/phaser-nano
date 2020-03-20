@@ -637,6 +637,22 @@ void main (void)
         };
     }
 
+    function InputComponent(Base) {
+        return class InputComponent extends Base {
+            constructor() {
+                super(...arguments);
+                this.inputEnabled = false;
+                this.inputEnabledChildren = true;
+            }
+            setInteractive(hitArea) {
+                this.inputEnabled = true;
+                this.inputHitArea = hitArea;
+                this.inputEnabledChildren = true;
+                return this;
+            }
+        };
+    }
+
     class Vec2 {
         /**
          * Creates an instance of a Vector2.
@@ -1166,6 +1182,7 @@ void main (void)
         AlphaComponent,
         DirtyComponent,
         ParentComponent,
+        InputComponent,
         OriginComponent,
         PositionComponent,
         RenderableComponent,
@@ -2028,8 +2045,9 @@ void main (void)
         }
         stop() {
             this.isLoading = false;
-            this.emit('complete');
+            this.emit('complete', this.completed);
             this.onComplete();
+            this.completed.clear();
         }
         updateProgress(file) {
             this.inflight.delete(file);
@@ -2077,39 +2095,186 @@ void main (void)
         }
     }
 
+    function AppendMatrix2d(mat1, mat2) {
+        const a1 = mat1.a;
+        const b1 = mat1.b;
+        const c1 = mat1.c;
+        const d1 = mat1.d;
+        const a = (mat2.a * a1) + (mat2.b * c1);
+        const b = (mat2.a * b1) + (mat2.b * d1);
+        const c = (mat2.c * a1) + (mat2.d * c1);
+        const d = (mat2.c * b1) + (mat2.d * d1);
+        const tx = (mat2.tx * a1) + (mat2.ty * c1) + mat1.tx;
+        const ty = (mat2.tx * b1) + (mat2.ty * d1) + mat1.ty;
+        return { a, b, c, d, tx, ty };
+    }
+
+    class Mouse extends EventEmitter {
+        constructor(target) {
+            super();
+            this.primaryDown = false;
+            this.auxDown = false;
+            this.secondaryDown = false;
+            this.resolution = 1;
+            this.mousedownHandler = (event) => this.onMouseDown(event);
+            this.mouseupHandler = (event) => this.onMouseUp(event);
+            this.mousemoveHandler = (event) => this.onMouseMove(event);
+            this.blurHandler = () => this.onBlur();
+            target.addEventListener('mousedown', this.mousedownHandler);
+            target.addEventListener('mouseup', this.mouseupHandler);
+            window.addEventListener('mouseup', this.mouseupHandler);
+            window.addEventListener('blur', this.blurHandler);
+            window.addEventListener('mousemove', this.mousemoveHandler);
+            this.localPoint = new Vec2();
+            this.hitPoint = new Vec2();
+            this.transPoint = new Vec2();
+            this.target = target;
+        }
+        onBlur() {
+        }
+        onMouseDown(event) {
+            this.positionToPoint(event);
+            this.primaryDown = (event.button === 0);
+            this.auxDown = (event.button === 1);
+            this.secondaryDown = (event.button === 2);
+            this.emit('pointerdown', this.localPoint.x, this.localPoint.y, event.button, event);
+        }
+        onMouseUp(event) {
+            this.positionToPoint(event);
+            this.primaryDown = !(event.button === 0);
+            this.auxDown = !(event.button === 1);
+            this.secondaryDown = !(event.button === 2);
+            this.emit('pointerup', this.localPoint.x, this.localPoint.y, event.button, event);
+        }
+        onMouseMove(event) {
+            this.positionToPoint(event);
+            this.emit('pointermove', this.localPoint.x, this.localPoint.y, event);
+        }
+        positionToPoint(event) {
+            const local = this.localPoint;
+            //  if the event has offsetX/Y we can use that directly, as it gives us a lot better
+            //  result, taking into account things like css transforms
+            if (typeof event.offsetX === 'number') {
+                local.set(event.offsetX, event.offsetY);
+            }
+            else {
+                const rect = this.target.getBoundingClientRect();
+                const width = this.target.hasAttribute('width') ? this.target['width'] : 0;
+                const height = this.target.hasAttribute('height') ? this.target['height'] : 0;
+                const multiplier = 1 / this.resolution;
+                local.x = ((event.clientX - rect.left) * (width / rect.width)) * multiplier;
+                local.y = ((event.clientY - rect.top) * (height / rect.height)) * multiplier;
+            }
+            return local;
+        }
+        getInteractiveChildren(parent, results) {
+            const children = parent.children;
+            for (let i = 0; i < children.length; i++) {
+                let child = children[i];
+                if (child.visible && child.inputEnabled) {
+                    results.push(child);
+                }
+                if (child.inputEnabledChildren && child.isParent) {
+                    this.getInteractiveChildren(child, results);
+                }
+            }
+        }
+        checkHitArea(entity, px, py) {
+            if (entity.inputHitArea) {
+                if (entity.inputHitArea.contains(px, py)) {
+                    return true;
+                }
+            }
+            else {
+                const left = -(entity.width * entity.originX);
+                const right = left + entity.width;
+                const top = -(entity.height * entity.originY);
+                const bottom = top + entity.height;
+                return (px >= left && px <= right && py >= top && py <= bottom);
+            }
+            return false;
+        }
+        hitTest(...entities) {
+            const localX = this.localPoint.x;
+            const localY = this.localPoint.y;
+            const point = this.transPoint;
+            for (let i = 0; i < entities.length; i++) {
+                let entity = entities[i];
+                let mat = AppendMatrix2d(entity.scene.world.camera.worldTransform, entity.worldTransform);
+                GlobalToLocal(mat, localX, localY, point);
+                if (this.checkHitArea(entity, point.x, point.y)) {
+                    this.hitPoint.set(point.x, point.y);
+                    return true;
+                }
+            }
+            return false;
+        }
+        hitTestChildren(container, topOnly = true) {
+            const output = [];
+            if (!container.visible) {
+                return output;
+            }
+            //  Build a list of potential input candidates
+            const candidates = [];
+            if (container.inputEnabled) {
+                candidates.push(container);
+            }
+            if (container.inputEnabledChildren && container.numChildren > 0) {
+                this.getInteractiveChildren(container, candidates);
+            }
+            for (let i = candidates.length - 1; i >= 0; i--) {
+                let entity = candidates[i];
+                if (this.hitTest(entity)) {
+                    output.push(entity);
+                    if (topOnly) {
+                        break;
+                    }
+                }
+            }
+            return output;
+        }
+    }
+
     class Demo extends Scene {
         constructor(game) {
             super(game);
+            // new Stats(game, 'base');
             const loader = new Loader(game);
             loader.setPath('assets');
-            loader.add(ImageFile(game, '1x1'), ImageFile(game, '2x2'), ImageFile(game, '4x4'), ImageFile(game, '8x8'), ImageFile(game, '32x32'), ImageFile(game, '128x128'), ImageFile(game, '512x512'), ImageFile(game, 'ayu'), ImageFile(game, 'balls'), ImageFile(game, 'beball1'), ImageFile(game, 'box-item-boxed'), ImageFile(game, 'brain'), ImageFile(game, 'bubble256'), ImageFile(game, 'bubbles-background'), ImageFile(game, 'car'), ImageFile(game, 'carrot'), ImageFile(game, 'checker'), ImageFile(game, 'clown'), ImageFile(game, 'hotdog'), ImageFile(game, 'lance-overdose-loader-eye'), ImageFile(game, 'lemming'), ImageFile(game, 'logo'), ImageFile(game, 'mushroom-32x32'), ImageFile(game, 'muzzleflash2'), ImageFile(game, 'orange-cat1'), ImageFile(game, 'orb-blue'), ImageFile(game, 'orb-red'), ImageFile(game, 'pacman_by_oz_28x28'), ImageFile(game, 'phaser-ship'), ImageFile(game, 'phaser_tiny'), ImageFile(game, 'red'), ImageFile(game, 'rocket'), ImageFile(game, 'shinyball'), ImageFile(game, 'skull'), ImageFile(game, 'sonic'), ImageFile(game, 'star'), ImageFile(game, 'terrain2'), ImageFile(game, 'uv-grid-diag'));
-            loader.setMaxParallelDownloads(1);
-            loader.on('progress', (progress, totalCompleted, totalQueued) => {
-                console.log(progress, ' - (' + totalCompleted + ' / ' + totalQueued + ')');
-            });
+            loader.add(ImageFile(game, '512', '512x512.png'), ImageFile(game, '256', 'f-texture.png'), ImageFile(game, '128', '128x128.png'), ImageFile(game, '64', 'box-item-boxed.png'), ImageFile(game, '32', '32x32.png'));
             loader.start(() => this.create());
         }
         create() {
-            const sprite1 = new Sprite(this, 400, 300, 'logo');
-            const sprite2 = new Sprite(this, 400, 300, 'star');
-            const sprite3 = new Sprite(this, 400, 50, 'clown');
-            this.game.scenes.flush = true;
-            this.world.addChild(sprite1, sprite2, sprite3);
+            const mouse = new Mouse(this.game.renderer.canvas);
+            const parent1 = new Sprite(this, 400, 300, '512');
+            const parent2 = new Sprite(this, 0, 0, '256');
+            const parent3 = new Sprite(this, 0, 0, '128');
+            const parent4 = new Sprite(this, 0, 0, '64');
+            const child = new Sprite(this, 0, 0, '32');
+            child.setInteractive();
+            parent1.addChild(parent2);
+            parent2.addChild(parent3);
+            parent3.addChild(parent4);
+            parent4.addChild(child);
+            this.world.addChild(parent1);
+            mouse.on('pointerdown', (x, y) => {
+                const results = mouse.hitTestChildren(parent1);
+                console.log((results.length > 0) ? 'Hit!' : 'None');
+            });
         }
     }
-    function demo34 () {
-        const game = new Game({
+    function demo36 () {
+        let game = new Game({
             width: 800,
             height: 600,
             backgroundColor: 0x000033,
             parent: 'gameParent',
             scene: Demo
         });
-        window['game'] = game;
     }
 
     // import demo1 from './demo1'; // test single sprite
-    demo34();
+    demo36();
     //  Next steps:
     //  * Camera tint + alpha (as shader uniform)
     //  * Camera background color (instead of renderer bgc)

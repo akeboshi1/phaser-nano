@@ -31,9 +31,11 @@
 // import demo31 from './demo31'; // Scene Manager Test
 // import demo32 from './demo32'; // New Loader test
 // import demo33 from './demo33'; // AtlasFile test
-import demo34 from './demo34'; // Loader Progress test
+// import demo34 from './demo34'; // Loader Progress test
+// import demo35 from './demo35'; // Mouse Input - Hit Test
+import demo36 from './demo36'; // Mouse Input - Hit Test Children
 
-demo34();
+demo36();
 
 //  Next steps:
 
