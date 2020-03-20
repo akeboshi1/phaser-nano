@@ -13,8 +13,7 @@ export default function SpriteSheetFile (game: Game, key: string, url: string, f
 
         file.url = GetURL(file.key, file.url, '.png', file.loader);
 
-        return new Promise(
-            (resolve, reject) => {
+        return new Promise((resolve, reject) => {
 
                 ImageTagLoader(file).then(file => {
 

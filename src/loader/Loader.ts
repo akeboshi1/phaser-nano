@@ -34,7 +34,7 @@ export default class Loader
         this.inflight = new Set();
     }
 
-    add (...file: File[])
+    add (...file: File[]): this
     {
         file.forEach((entity) => {
 
@@ -111,25 +111,14 @@ export default class Loader
         this.onComplete();
     }
 
-    fileComplete (file: File)
+    private fileComplete (file: File)
     {
-        //  Link file?
-        /*
-        if (file.linkFile && file.linkFile.hasLoaded)
-        {
-            const imageFile = (file.type === 'atlasimage') ? file : file.linkFile;
-            const jsonFile = (file.type === 'atlasjson') ? file : file.linkFile;
-
-            this.game.textures.addAtlas(file.key, imageFile.data, jsonFile.data);
-        }
-        */
-
         this.inflight.delete(file);
 
         this.nextFile();
     }
 
-    fileError (file: File)
+    private fileError (file: File)
     {
         this.inflight.delete(file);
 
@@ -140,24 +129,6 @@ export default class Loader
     {
         return this.queue.size + this.inflight.size;
     }
-
-    /*
-    atlas (key: string, textureURL?: string, atlasURL?: string)
-    {
-        let textureFile = new File('atlasimage', key, this.getURL(key, textureURL, '.png'), (file: File) => this.imageTagLoader(file));
-        let JSONFile = new File('atlasjson', key, this.getURL(key, atlasURL, '.json'), (file: File) => this.XHRLoader(file));
-
-        JSONFile.config = { responseType: 'text' };
-
-        textureFile.linkFile = JSONFile;
-        JSONFile.linkFile = textureFile;
-
-        this.queue.push(textureFile);
-        this.queue.push(JSONFile);
-
-        return this;
-    }
-    */
 
     setBaseURL (url: string = ''): this
     {

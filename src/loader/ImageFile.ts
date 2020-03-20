@@ -11,14 +11,14 @@ export default function ImageFile (game: Game, key: string, url?: string): File
 
         file.url = GetURL(file.key, file.url, '.png', file.loader);
 
-        // console.log('load called on', file.url);
+        if (file.loader)
+        {
+            file.crossOrigin = file.loader.crossOrigin;
+        }
 
-        return new Promise(
-            (resolve, reject) => {
+        return new Promise((resolve, reject) => {
 
                 ImageTagLoader(file).then(file => {
-
-                    // console.log('ImageFile resolved');
 
                     game.textures.add(key, file.data);
 

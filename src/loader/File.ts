@@ -9,7 +9,6 @@ export default class File
     data: any;
     error: ErrorEvent | undefined;
     config: any;
-    linkFile: File;
     hasLoaded: boolean = false;
     loader: Loader;
     load: () => Promise<File>;

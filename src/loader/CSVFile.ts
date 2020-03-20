@@ -11,8 +11,7 @@ export default function CSVFile (game: Game, key: string, url?: string): File
 
         file.url = GetURL(file.key, file.url, '.csv', file.loader);
 
-        return new Promise(
-            (resolve, reject) => {
+        return new Promise((resolve, reject) => {
 
                 XHRLoader(file).then(file => {
 

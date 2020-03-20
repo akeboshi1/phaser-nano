@@ -29,9 +29,10 @@
 // import demo29 from './demo29'; // Rotating items
 // import demo30 from './demo30'; // PNG import via Rollup images plugin
 // import demo31 from './demo31'; // Scene Manager Test
-import demo32 from './demo32'; // New Loader test
+// import demo32 from './demo32'; // New Loader test
+import demo33 from './demo33'; // AtlasFile test
 
-demo32();
+demo33();
 
 //  Next steps:
 
