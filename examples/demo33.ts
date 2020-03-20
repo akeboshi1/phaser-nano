@@ -6,6 +6,8 @@ import Loader from '../src/loader/Loader';
 
 class Demo extends Scene
 {
+    dx: number = 1;
+
     constructor (game: Game)
     {
         super(game);
@@ -27,6 +29,18 @@ class Demo extends Scene
         const sprite3 = new Sprite(this, 400, 50, 'test', 'brain');
 
         this.world.addChild(sprite1, sprite2, sprite3);
+
+        window['scene'] = this;
+    }
+
+    update ()
+    {
+        this.world.camera.x += this.dx;
+
+        if (this.world.camera.x < -300 || this.world.camera.x > 300)
+        {
+            this.dx *= -1;
+        }
     }
 }
 
@@ -39,6 +53,4 @@ export default function ()
         parent: 'gameParent',
         scene: Demo
     });
-
-    window['game'] = game;
 }

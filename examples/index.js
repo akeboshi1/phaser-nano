@@ -1218,7 +1218,7 @@ void main (void)
             this.setSize(this.renderer.width, this.renderer.height);
         }
         updateTransform() {
-            this.dirtyFrame = this.scene.game.frame;
+            this.setDirty();
             const lt = this.localTransform;
             const wt = this.worldTransform;
             lt.tx = this.x;
@@ -1288,6 +1288,9 @@ void main (void)
             this.renderList.length = 0;
             this.scanChildren(this, gameFrame);
             this.totalFrame = this.renderList.length;
+            if (this.camera.dirtyFrame >= gameFrame) {
+                this.dirtyFrame++;
+            }
             return this.dirtyFrame;
         }
     }
@@ -1680,6 +1683,11 @@ void main (void)
             this.frame = 0;
             const { width = 800, height = 600, backgroundColor = 0x00000, parent = document.body, scene = null } = config;
             this.config = { width, height, backgroundColor, parent, scene };
+            this.cache = {
+                json: new Map(),
+                csv: new Map(),
+                xml: new Map()
+            };
             DOMContentLoaded(() => this.boot());
         }
         pause() {
@@ -1877,6 +1885,7 @@ void main (void)
         constructor(key, url, config) {
             this.responseType = 'text';
             this.crossOrigin = undefined;
+            this.skipCache = false;
             this.hasLoaded = false;
             this.key = key;
             this.url = url;
@@ -1926,7 +1935,9 @@ void main (void)
             return new Promise((resolve, reject) => {
                 XHRLoader(file).then(file => {
                     file.data = JSON.parse(file.data);
-                    //  game.cache.stuff
+                    if (!file.skipCache) {
+                        game.cache.json.set(file.key, file.data);
+                    }
                     resolve(file);
                 }).catch(file => {
                     reject(file);
@@ -2033,6 +2044,7 @@ void main (void)
             json.url = GetURL(json.key, json.url, '.json', file.loader);
             image.url = GetURL(image.key, image.url, '.png', file.loader);
             return new Promise((resolve, reject) => {
+                json.skipCache = true;
                 json.load().then(() => {
                     image.load().then(() => {
                         //  By this stage, the JSON and image are loaded and in the texture manager
@@ -2148,6 +2160,7 @@ void main (void)
     class Demo extends Scene {
         constructor(game) {
             super(game);
+            this.dx = 1;
             const loader = new Loader(game);
             loader.setPath('assets');
             // loader.add(AtlasFile(game, 'test', 'atlas-notrim.png', 'atlas-notrim.json'));
@@ -2159,6 +2172,13 @@ void main (void)
             const sprite2 = new Sprite(this, 400, 300, 'test', 'hello');
             const sprite3 = new Sprite(this, 400, 50, 'test', 'brain');
             this.world.addChild(sprite1, sprite2, sprite3);
+            window['scene'] = this;
+        }
+        update() {
+            this.world.camera.x += this.dx;
+            if (this.world.camera.x < -300 || this.world.camera.x > 300) {
+                this.dx *= -1;
+            }
         }
     }
     function demo33 () {
@@ -2169,21 +2189,21 @@ void main (void)
             parent: 'gameParent',
             scene: Demo
         });
-        window['game'] = game;
     }
 
     // import demo1 from './demo1'; // test single sprite
     demo33();
     //  Next steps:
-    //  * Camera moving needs to dirty the renderer
-    //  * Load json / csv / xml on their own
     //  * Camera tint + alpha (as shader uniform)
     //  * Camera background color (instead of renderer bgc)
     //  * Multi Texture re-use old texture IDs when count > max supported
     //  * Single Texture shader
     //  * Tile Layer
+    //  * Sprite Sheet from Atlas Frame extractor
     //  * Instead of a Quad class, try a class that can have any number of vertices in it (ala Rope), or any vertex moved
     //  Done:
+    //  X Camera moving needs to dirty the renderer
+    //  X Load json / csv / xml on their own
     //  X Base64 Loader Test
     //  X Input point translation
     //  X Static Batch shader (Sprite Buffer)

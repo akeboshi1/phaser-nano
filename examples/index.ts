@@ -36,17 +36,18 @@ demo33();
 
 //  Next steps:
 
-//  * Camera moving needs to dirty the renderer
-//  * Load json / csv / xml on their own
 //  * Camera tint + alpha (as shader uniform)
 //  * Camera background color (instead of renderer bgc)
 //  * Multi Texture re-use old texture IDs when count > max supported
 //  * Single Texture shader
 //  * Tile Layer
+//  * Sprite Sheet from Atlas Frame extractor
 //  * Instead of a Quad class, try a class that can have any number of vertices in it (ala Rope), or any vertex moved
 
 //  Done:
 
+//  X Camera moving needs to dirty the renderer
+//  X Load json / csv / xml on their own
 //  X Base64 Loader Test
 //  X Input point translation
 //  X Static Batch shader (Sprite Buffer)
