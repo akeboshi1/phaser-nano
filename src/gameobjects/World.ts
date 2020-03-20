@@ -75,6 +75,11 @@ export default class World extends Container
 
         this.totalFrame = this.renderList.length;
 
+        if (this.camera.dirtyFrame >= gameFrame)
+        {
+            this.dirtyFrame++;
+        }
+
         return this.dirtyFrame;
     }
 }

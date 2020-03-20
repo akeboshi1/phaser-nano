@@ -23,7 +23,7 @@ export default class Camera extends GameObject
 
     updateTransform ()
     {
-        this.dirtyFrame = this.scene.game.frame;
+        this.setDirty();
 
         const lt = this.localTransform;
         const wt = this.worldTransform;
