@@ -127,9 +127,11 @@ export default class Loader extends EventEmitter
     {
         this.isLoading = false;
 
-        this.emit('complete');
+        this.emit('complete', this.completed);
 
         this.onComplete();
+
+        this.completed.clear();
     }
 
     private updateProgress (file: File)
