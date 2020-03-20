@@ -2,6 +2,7 @@ import File from '../File';
 import XHRLoader from '../XHRLoader';
 import Game from '../../Game';
 import GetURL from '../GetURL';
+import ParseXML from '../../core/ParseXML';
 
 export default function XMLFile (game: Game, key: string, url?: string): File
 {
@@ -15,10 +16,21 @@ export default function XMLFile (game: Game, key: string, url?: string): File
 
             XHRLoader(file).then(file => {
 
-                // file.data = JSON.parse(file.data);
-                //  game.cache.stuff
+                const xml = ParseXML(file.data);
 
-                resolve(file);
+                if (xml !== null)
+                {
+                    if (!file.skipCache)
+                    {
+                        game.cache.xml.set(file.key, xml);
+                    }
+
+                    resolve(file);
+                }
+                else
+                {
+                    reject(file);
+                }
     
             }).catch(file => {
 
