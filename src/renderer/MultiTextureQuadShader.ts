@@ -231,6 +231,8 @@ export default class MultiTextureQuadShader
 
         this.createBuffers();
         this.createShaders(fragmentShader, vertexShader);
+
+        this.count = 0;
     }
 
     createBuffers ()
