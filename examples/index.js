@@ -241,31 +241,6 @@ void main (void)
             gl.vertexAttribPointer(attribs.color, 4, gl.UNSIGNED_BYTE, true, stride, 20); // size = 4, offset = position + tex coord + index
             this.count = 0;
         }
-        /*
-        batchSpriteBuffer (buffer: SpriteBuffer): boolean
-        {
-            if (buffer.size > 0)
-            {
-                this.flush();
-
-                buffer.render();
-
-                //  Restore buffers
-                this.bindBuffers(this.indexBuffer, this.vertexBuffer);
-
-                return true;
-            }
-
-            return false;
-        }
-        */
-        batchSprite(sprite) {
-            if (this.count === this.batchSize) {
-                this.flush();
-            }
-            sprite.updateVertices(this.vertexViewF32, this.vertexViewU32, this.count * this.quadElementSize);
-            this.count++;
-        }
         flush() {
             const count = this.count;
             if (count === 0) {
@@ -424,9 +399,6 @@ void main (void)
                 gl.clearColor(cls[0], cls[1], cls[2], cls[3]);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
-            const maxTextures = this.maxTextures;
-            const activeTextures = this.activeTextures;
-            const startActiveTexture = this.startActiveTexture;
             for (let c = 0; c < sceneList.length; c += 2) {
                 let camera = sceneList[c];
                 let list = sceneList[c + 1];
@@ -435,35 +407,23 @@ void main (void)
                 shader.bind(camera);
                 //  Process the render list
                 for (let i = 0; i < list.length; i++) {
-                    let entity = list[i];
-                    let texture = entity.texture;
-                    if (texture.glIndexCounter < startActiveTexture) {
-                        texture.glIndexCounter = startActiveTexture;
-                        if (this.currentActiveTexture < maxTextures) {
-                            //  Make this texture active
-                            activeTextures[this.currentActiveTexture] = texture;
-                            texture.glIndex = this.currentActiveTexture;
-                            gl.activeTexture(gl.TEXTURE0 + this.currentActiveTexture);
-                            gl.bindTexture(gl.TEXTURE_2D, texture.glTexture);
-                            this.currentActiveTexture++;
-                        }
-                    }
-                    /*
-                    if (entity.type === 'SpriteBuffer')
-                    {
-                        if (shader.batchSpriteBuffer(entity as SpriteBuffer))
-                        {
-                            //  Reset active textures
-                            this.currentActiveTexture = 0;
-                            this.startActiveTexture++;
-                        }
-                    }
-                    */
-                    shader.batchSprite(entity);
+                    list[i].renderWebGL(this, shader, this.startActiveTexture);
                 }
                 //  This only needs flushing if the next
                 //  Scene has a different camera matrix
                 shader.flush();
+            }
+        }
+        requestTexture(texture) {
+            const gl = this.gl;
+            texture.glIndexCounter = this.startActiveTexture;
+            if (this.currentActiveTexture < this.maxTextures) {
+                //  Make this texture active
+                this.activeTextures[this.currentActiveTexture] = texture;
+                texture.glIndex = this.currentActiveTexture;
+                gl.activeTexture(gl.TEXTURE0 + this.currentActiveTexture);
+                gl.bindTexture(gl.TEXTURE_2D, texture.glTexture);
+                this.currentActiveTexture++;
             }
         }
     }
@@ -1093,6 +1053,17 @@ void main (void)
                 data[21] = frame.v0;
                 this.setDirty();
                 this.hasTexture = true;
+                return this;
+            }
+        };
+    }
+
+    function TransformBypassComponent(Base) {
+        return class TransformComponent extends Base {
+            constructor(...args) {
+                super(args);
+            }
+            updateTransform() {
                 return this;
             }
         };
@@ -1810,6 +1781,17 @@ void main (void)
             this.setDirty();
             return this;
         }
+        renderWebGL(renderer, shader, startActiveTexture) {
+            const texture = this.texture;
+            if (texture.glIndexCounter < startActiveTexture) {
+                renderer.requestTexture(texture);
+            }
+            if (shader.count === shader.batchSize) {
+                shader.flush();
+            }
+            this.updateVertices(shader.vertexViewF32, shader.vertexViewU32, shader.count * shader.quadElementSize);
+            shader.count++;
+        }
         updateVertices(F32, U32, offset) {
             const data = this.vertexData;
             //  Skip all of this if not dirty
@@ -1898,6 +1880,134 @@ void main (void)
         23 = topRight.packedColor
     */
 
+    class SpriteBuffer extends Install(class {
+    }, [
+        DirtyComponent,
+        ParentComponent,
+        RenderableComponent,
+        SceneComponent,
+        TransformBypassComponent,
+        VisibleComponent
+    ]) {
+        constructor(scene, maxSize) {
+            super();
+            this.scene = scene;
+            const renderer = scene.game.renderer;
+            this.renderer = renderer;
+            this.gl = renderer.gl;
+            this.shader = renderer.shader;
+            this.resetBuffers(maxSize);
+        }
+        willRender() {
+            return (this.visible && this.renderable && this.size > 0);
+        }
+        resetBuffers(maxSize) {
+            const gl = this.gl;
+            const shader = this.shader;
+            const indexSize = shader.indexSize;
+            this.indexType = gl.UNSIGNED_SHORT;
+            if (maxSize > 65535) {
+                if (!this.renderer.elementIndexExtension) {
+                    console.warn('OES uint element index unsupported. maxSize cannot exceed 65535');
+                    maxSize = 65535;
+                }
+                else {
+                    this.indexType = gl.UNSIGNED_INT;
+                }
+            }
+            let ibo = [];
+            //  Seed the index buffer
+            for (let i = 0; i < (maxSize * indexSize); i += indexSize) {
+                ibo.push(i + 0, i + 1, i + 2, i + 2, i + 3, i + 0);
+            }
+            this.data = new ArrayBuffer(maxSize * shader.quadByteSize);
+            if (this.indexType === gl.UNSIGNED_SHORT) {
+                this.index = new Uint16Array(ibo);
+            }
+            else {
+                this.index = new Uint32Array(ibo);
+            }
+            this.vertexViewF32 = new Float32Array(this.data);
+            this.vertexViewU32 = new Uint32Array(this.data);
+            this.vertexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.data, gl.STATIC_DRAW);
+            this.indexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.index, gl.STATIC_DRAW);
+            //  Tidy-up
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+            ibo = [];
+            this.size = 0;
+            this.maxSize = maxSize;
+            this.quadIndexSize = shader.quadIndexSize;
+            this.texture = null;
+        }
+        renderWebGL(renderer, shader, startActiveTexture) {
+            shader.flush();
+            const gl = this.gl;
+            this.shader.bindBuffers(this.indexBuffer, this.vertexBuffer);
+            if (this.dirty) {
+                gl.bufferData(gl.ARRAY_BUFFER, this.data, gl.STATIC_DRAW);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.index, gl.STATIC_DRAW);
+                this.dirty = false;
+            }
+            if (this.texture.glIndexCounter < startActiveTexture) {
+                renderer.requestTexture(this.texture);
+            }
+            gl.drawElements(gl.TRIANGLES, this.size * this.quadIndexSize, this.indexType, 0);
+            //  Restore buffers
+            shader.bindBuffers(shader.indexBuffer, shader.vertexBuffer);
+        }
+        /**
+         * Adds a new entry into this SpriteBuffer.
+         *
+         * A SpriteBuffer can only use one single Texture for all of its entries.
+         * However, they can use any frame from that texture.
+         *
+         * The most recent sprite added to this Sprite Buffer will determine the
+         * Texture for all of the rest.
+         *
+         * @param sprites
+         */
+        add(...sprites) {
+            const quadSize = this.shader.quadElementSize;
+            const F32 = this.vertexViewF32;
+            const U32 = this.vertexViewU32;
+            sprites.forEach(sprite => {
+                if (this.size < this.maxSize) {
+                    sprite.updateVertices(F32, U32, this.size * quadSize);
+                    this.texture = sprite.texture;
+                    this.size++;
+                }
+            });
+            this.setDirty(true);
+            return this;
+        }
+        addAt(offset, ...sprites) {
+            const quadSize = this.shader.quadElementSize;
+            const F32 = this.vertexViewF32;
+            const U32 = this.vertexViewU32;
+            let index = offset;
+            sprites.forEach(sprite => {
+                if (index < this.maxSize) {
+                    sprite.updateVertices(F32, U32, index * quadSize);
+                    this.texture = sprite.texture;
+                    index++;
+                    if (index > this.size) {
+                        this.size++;
+                    }
+                }
+            });
+            this.setDirty(true);
+            return this;
+        }
+        clear() {
+            this.resetBuffers(this.maxSize);
+            return this;
+        }
+    }
+
     class File {
         constructor(key, url, config) {
             this.responseType = 'text';
@@ -1969,6 +2079,80 @@ void main (void)
                 ImageTagLoader(file).then(file => {
                     game.textures.add(key, file.data);
                     resolve(file);
+                }).catch(file => {
+                    reject(file);
+                });
+            });
+        };
+        return file;
+    }
+
+    function SpriteSheetParser (texture, x, y, width, height, frameConfig) {
+        let { frameWidth = null, frameHeight = null, startFrame = 0, endFrame = -1, margin = 0, spacing = 0 } = frameConfig;
+        if (!frameHeight) {
+            frameHeight = frameWidth;
+        }
+        //  If missing we can't proceed
+        if (frameWidth === null) {
+            throw new Error('TextureManager.SpriteSheet: Invalid frameWidth given.');
+        }
+        const row = Math.floor((width - margin + spacing) / (frameWidth + spacing));
+        const column = Math.floor((height - margin + spacing) / (frameHeight + spacing));
+        let total = row * column;
+        if (total === 0) {
+            console.warn('SpriteSheet frame dimensions will result in zero frames.');
+        }
+        if (startFrame > total || startFrame < -total) {
+            startFrame = 0;
+        }
+        if (startFrame < 0) {
+            //  Allow negative skipframes.
+            startFrame = total + startFrame;
+        }
+        if (endFrame !== -1) {
+            total = startFrame + (endFrame + 1);
+        }
+        let fx = margin;
+        let fy = margin;
+        let ax = 0;
+        let ay = 0;
+        for (let i = 0; i < total; i++) {
+            ax = 0;
+            ay = 0;
+            let w = fx + frameWidth;
+            let h = fy + frameHeight;
+            if (w > width) {
+                ax = w - width;
+            }
+            if (h > height) {
+                ay = h - height;
+            }
+            texture.add(i, x + fx, y + fy, frameWidth - ax, frameHeight - ay);
+            fx += frameWidth + spacing;
+            if (fx + frameWidth > width) {
+                fx = margin;
+                fy += frameHeight + spacing;
+            }
+        }
+    }
+
+    function SpriteSheetFile(game, key, url, frameConfig) {
+        const file = new File(key, url);
+        file.load = () => {
+            file.url = GetURL(file.key, file.url, '.png', file.loader);
+            if (file.loader) {
+                file.crossOrigin = file.loader.crossOrigin;
+            }
+            return new Promise((resolve, reject) => {
+                ImageTagLoader(file).then(file => {
+                    const texture = game.textures.add(key, file.data);
+                    if (texture) {
+                        SpriteSheetParser(texture, 0, 0, texture.width, texture.height, frameConfig);
+                        resolve(file);
+                    }
+                    else {
+                        reject(file);
+                    }
                 }).catch(file => {
                     reject(file);
                 });
@@ -2095,175 +2279,40 @@ void main (void)
         }
     }
 
-    function AppendMatrix2d(mat1, mat2) {
-        const a1 = mat1.a;
-        const b1 = mat1.b;
-        const c1 = mat1.c;
-        const d1 = mat1.d;
-        const a = (mat2.a * a1) + (mat2.b * c1);
-        const b = (mat2.a * b1) + (mat2.b * d1);
-        const c = (mat2.c * a1) + (mat2.d * c1);
-        const d = (mat2.c * b1) + (mat2.d * d1);
-        const tx = (mat2.tx * a1) + (mat2.ty * c1) + mat1.tx;
-        const ty = (mat2.tx * b1) + (mat2.ty * d1) + mat1.ty;
-        return { a, b, c, d, tx, ty };
-    }
-
-    class Mouse extends EventEmitter {
-        constructor(target) {
-            super();
-            this.primaryDown = false;
-            this.auxDown = false;
-            this.secondaryDown = false;
-            this.resolution = 1;
-            this.mousedownHandler = (event) => this.onMouseDown(event);
-            this.mouseupHandler = (event) => this.onMouseUp(event);
-            this.mousemoveHandler = (event) => this.onMouseMove(event);
-            this.blurHandler = () => this.onBlur();
-            target.addEventListener('mousedown', this.mousedownHandler);
-            target.addEventListener('mouseup', this.mouseupHandler);
-            window.addEventListener('mouseup', this.mouseupHandler);
-            window.addEventListener('blur', this.blurHandler);
-            window.addEventListener('mousemove', this.mousemoveHandler);
-            this.localPoint = new Vec2();
-            this.hitPoint = new Vec2();
-            this.transPoint = new Vec2();
-            this.target = target;
-        }
-        onBlur() {
-        }
-        onMouseDown(event) {
-            this.positionToPoint(event);
-            this.primaryDown = (event.button === 0);
-            this.auxDown = (event.button === 1);
-            this.secondaryDown = (event.button === 2);
-            this.emit('pointerdown', this.localPoint.x, this.localPoint.y, event.button, event);
-        }
-        onMouseUp(event) {
-            this.positionToPoint(event);
-            this.primaryDown = !(event.button === 0);
-            this.auxDown = !(event.button === 1);
-            this.secondaryDown = !(event.button === 2);
-            this.emit('pointerup', this.localPoint.x, this.localPoint.y, event.button, event);
-        }
-        onMouseMove(event) {
-            this.positionToPoint(event);
-            this.emit('pointermove', this.localPoint.x, this.localPoint.y, event);
-        }
-        positionToPoint(event) {
-            const local = this.localPoint;
-            //  if the event has offsetX/Y we can use that directly, as it gives us a lot better
-            //  result, taking into account things like css transforms
-            if (typeof event.offsetX === 'number') {
-                local.set(event.offsetX, event.offsetY);
-            }
-            else {
-                const rect = this.target.getBoundingClientRect();
-                const width = this.target.hasAttribute('width') ? this.target['width'] : 0;
-                const height = this.target.hasAttribute('height') ? this.target['height'] : 0;
-                const multiplier = 1 / this.resolution;
-                local.x = ((event.clientX - rect.left) * (width / rect.width)) * multiplier;
-                local.y = ((event.clientY - rect.top) * (height / rect.height)) * multiplier;
-            }
-            return local;
-        }
-        getInteractiveChildren(parent, results) {
-            const children = parent.children;
-            for (let i = 0; i < children.length; i++) {
-                let child = children[i];
-                if (child.visible && child.inputEnabled) {
-                    results.push(child);
-                }
-                if (child.inputEnabledChildren && child.isParent) {
-                    this.getInteractiveChildren(child, results);
-                }
-            }
-        }
-        checkHitArea(entity, px, py) {
-            if (entity.inputHitArea) {
-                if (entity.inputHitArea.contains(px, py)) {
-                    return true;
-                }
-            }
-            else {
-                const left = -(entity.width * entity.originX);
-                const right = left + entity.width;
-                const top = -(entity.height * entity.originY);
-                const bottom = top + entity.height;
-                return (px >= left && px <= right && py >= top && py <= bottom);
-            }
-            return false;
-        }
-        hitTest(...entities) {
-            const localX = this.localPoint.x;
-            const localY = this.localPoint.y;
-            const point = this.transPoint;
-            for (let i = 0; i < entities.length; i++) {
-                let entity = entities[i];
-                let mat = AppendMatrix2d(entity.scene.world.camera.worldTransform, entity.worldTransform);
-                GlobalToLocal(mat, localX, localY, point);
-                if (this.checkHitArea(entity, point.x, point.y)) {
-                    this.hitPoint.set(point.x, point.y);
-                    return true;
-                }
-            }
-            return false;
-        }
-        hitTestChildren(container, topOnly = true) {
-            const output = [];
-            if (!container.visible) {
-                return output;
-            }
-            //  Build a list of potential input candidates
-            const candidates = [];
-            if (container.inputEnabled) {
-                candidates.push(container);
-            }
-            if (container.inputEnabledChildren && container.numChildren > 0) {
-                this.getInteractiveChildren(container, candidates);
-            }
-            for (let i = candidates.length - 1; i >= 0; i--) {
-                let entity = candidates[i];
-                if (this.hitTest(entity)) {
-                    output.push(entity);
-                    if (topOnly) {
-                        break;
-                    }
-                }
-            }
-            return output;
-        }
-    }
-
     class Demo extends Scene {
         constructor(game) {
             super(game);
+            this.cx = 0;
+            this.ccx = 0;
+            this.ccy = 0;
             // new Stats(game, 'base');
             const loader = new Loader(game);
             loader.setPath('assets');
-            loader.add(ImageFile(game, '512', '512x512.png'), ImageFile(game, '256', 'f-texture.png'), ImageFile(game, '128', '128x128.png'), ImageFile(game, '64', 'box-item-boxed.png'), ImageFile(game, '32', '32x32.png'));
+            loader.add(SpriteSheetFile(game, 'pacman', 'pacman_by_oz_28x28.png', { frameWidth: 28 }), ImageFile(game, '128', '128x128.png'));
             loader.start(() => this.create());
         }
         create() {
-            const mouse = new Mouse(this.game.renderer.canvas);
-            const parent1 = new Sprite(this, 400, 300, '512');
-            const parent2 = new Sprite(this, 0, 0, '256');
-            const parent3 = new Sprite(this, 0, 0, '128');
-            const parent4 = new Sprite(this, 0, 0, '64');
-            const child = new Sprite(this, 0, 0, '32');
-            child.setInteractive();
-            parent1.addChild(parent2);
-            parent2.addChild(parent3);
-            parent3.addChild(parent4);
-            parent4.addChild(child);
-            this.world.addChild(parent1);
-            mouse.on('pointerdown', (x, y) => {
-                const results = mouse.hitTestChildren(parent1);
-                console.log((results.length > 0) ? 'Hit!' : 'None');
-            });
+            const pacman = new Sprite(this, 400, 300, 'pacman', 0);
+            const buffer = new SpriteBuffer(this, 65535);
+            for (let i = 0; i < buffer.maxSize; i++) {
+                let x = -1600 + Math.floor(Math.random() * 3200);
+                let y = -1200 + Math.floor(Math.random() * 2400);
+                let f = Math.floor(Math.random() * 11);
+                pacman.setPosition(x, y);
+                pacman.setFrame(f);
+                buffer.add(pacman);
+            }
+            this.world.addChild(buffer);
+        }
+        update(delta) {
+            this.ccx = Math.sin(this.cx) * 800;
+            this.ccy = Math.cos(this.cx) * 800;
+            this.world.camera.x = Math.floor(this.ccx);
+            this.world.camera.y = Math.floor(this.ccy);
+            this.cx += delta / 2;
         }
     }
-    function demo36 () {
+    function demo37 () {
         let game = new Game({
             width: 800,
             height: 600,
@@ -2274,7 +2323,7 @@ void main (void)
     }
 
     // import demo1 from './demo1'; // test single sprite
-    demo36();
+    demo37();
     //  Next steps:
     //  * Camera tint + alpha (as shader uniform)
     //  * Camera background color (instead of renderer bgc)

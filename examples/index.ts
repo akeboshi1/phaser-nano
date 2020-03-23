@@ -33,9 +33,10 @@
 // import demo33 from './demo33'; // AtlasFile test
 // import demo34 from './demo34'; // Loader Progress test
 // import demo35 from './demo35'; // Mouse Input - Hit Test
-import demo36 from './demo36'; // Mouse Input - Hit Test Children
+// import demo36 from './demo36'; // Mouse Input - Hit Test Children
+import demo37 from './demo37'; // Sprite Buffer
 
-demo36();
+demo37();
 
 //  Next steps:
 
