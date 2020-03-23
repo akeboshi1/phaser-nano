@@ -1,6 +1,6 @@
 import WebGLRenderer from './WebGLRenderer';
 import ISpriteMultiShader from './ISpriteMultiShader';
-import Camera from '../gameobjects/Camera';
+import ICamera from '../gameobjects/ICamera';
 
 const shaderSource = {
 
@@ -341,7 +341,7 @@ export default class MultiTextureQuadShader
         };
     }
 
-    bind (camera: Camera)
+    bind (camera: ICamera)
     {
         const gl = this.gl;
         const renderer = this.renderer;
