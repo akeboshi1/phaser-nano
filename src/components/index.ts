@@ -15,6 +15,7 @@ import { SceneComponent, ISceneComponent } from './SceneComponent';
 import { SizeComponent, ISizeComponent } from './SizeComponent';
 import { SkewComponent, ISkewComponent } from './SkewComponent';
 import { TextureComponent, ITextureComponent } from './TextureComponent';
+import { TransformBypassComponent, ITransformBypassComponent } from './TransformBypassComponent';
 import { TransformComponent, ITransformComponent } from './TransformComponent';
 import { VisibleComponent, IVisibleComponent } from './VisibleComponent';
 
@@ -36,6 +37,7 @@ export {
     SizeComponent,
     SkewComponent,
     TextureComponent,
+    TransformBypassComponent,
     TransformComponent,
     VisibleComponent,
 
@@ -56,6 +58,7 @@ export {
     ISizeComponent,
     ISkewComponent,
     ITextureComponent,
+    ITransformBypassComponent,
     ITransformComponent,
     IVisibleComponent
 }
