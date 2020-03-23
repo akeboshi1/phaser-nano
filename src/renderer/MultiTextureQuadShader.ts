@@ -1,7 +1,5 @@
 import WebGLRenderer from './WebGLRenderer';
-import ISprite from '../gameobjects/ISprite';
 import ISpriteMultiShader from './ISpriteMultiShader';
-// import SpriteBuffer from '../gameobjects/SpriteBuffer';
 import Camera from '../gameobjects/Camera';
 
 const shaderSource = {
@@ -375,37 +373,6 @@ export default class MultiTextureQuadShader
         gl.vertexAttribPointer(attribs.color, 4, gl.UNSIGNED_BYTE, true, stride, 20);   // size = 4, offset = position + tex coord + index
 
         this.count = 0;
-    }
-
-    /*
-    batchSpriteBuffer (buffer: SpriteBuffer): boolean
-    {
-        if (buffer.size > 0)
-        {
-            this.flush();
-
-            buffer.render();
-
-            //  Restore buffers
-            this.bindBuffers(this.indexBuffer, this.vertexBuffer);
-
-            return true;
-        }
-
-        return false;
-    }
-    */
-
-    batchSprite (sprite: ISprite)
-    {
-        if (this.count === this.batchSize)
-        {
-            this.flush();
-        }
-
-        sprite.updateVertices(this.vertexViewF32, this.vertexViewU32, this.count * this.quadElementSize);
-
-        this.count++;
     }
 
     flush ()

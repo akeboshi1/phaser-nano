@@ -4,6 +4,8 @@ import PackColor from '../renderer/PackColor';
 import * as Components from '../components';
 import Install from '../components/Install';
 import ISprite from './ISprite';
+import WebGLRenderer from '../renderer/WebGLRenderer';
+import MultiTextureQuadShader from '../renderer/MultiTextureQuadShader';
 
 export default class Sprite extends Install(GameObject, [
     Components.ContainerComponent,
@@ -42,6 +44,25 @@ export default class Sprite extends Install(GameObject, [
         this.setDirty();
 
         return this;
+    }
+
+    renderWebGL (renderer: WebGLRenderer, shader: MultiTextureQuadShader, startActiveTexture: number)
+    {
+        const texture = this.texture;
+
+        if (texture.glIndexCounter < startActiveTexture)
+        {
+            renderer.requestTexture(texture);
+        }
+
+        if (shader.count === shader.batchSize)
+        {
+            shader.flush();
+        }
+
+        this.updateVertices(shader.vertexViewF32, shader.vertexViewU32, shader.count * shader.quadElementSize);
+
+        shader.count++;
     }
 
     updateVertices (F32: Float32Array, U32: Uint32Array, offset: number)
