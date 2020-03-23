@@ -1,6 +1,7 @@
 import WebGLRenderer from '../renderer/WebGLRenderer';
 import GameObject from './GameObject';
 import Scene from '../Scene';
+import ICamera from './ICamera';
 
 export default class Camera extends GameObject
 {
@@ -42,7 +43,7 @@ export default class Camera extends GameObject
         mat[4] = c;
         mat[5] = d;
 
-        //  combinates viewport translation + scrollX/Y
+        //  combines viewport translation + scrollX/Y
 
         mat[12] = (a * -viewportW) + (c * -viewportH) + (viewportW + tx);
         mat[13] = (b * -viewportW) + (d * -viewportH) + (viewportH + ty);
@@ -63,3 +64,5 @@ export default class Camera extends GameObject
         return this;
     }
 }
+
+export default interface Camera extends ICamera {}
