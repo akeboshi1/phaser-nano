@@ -1,30 +1,21 @@
-import WebGLRenderer from '../renderer/WebGLRenderer';
-import Game from '../Game';
-import MultiTextureQuadShader from '../renderer/MultiTextureQuadShader';
-import Sprite from './Sprite';
+import Scene from '../Scene';
 import Texture from '../textures/Texture';
-// import DisplayObjectContainer from './DisplayObjectContainer';
-// import { Container } from './Container';
+import ISprite from './ISprite';
+import ISpriteBuffer from './ISpriteBuffer';
+import WebGLRenderer from '../renderer/WebGLRenderer';
+import MultiTextureQuadShader from '../renderer/MultiTextureQuadShader';
+import Install from '../components/Install';
+import * as Components from '../components';
 
-export default class SpriteBuffer
+export default class SpriteBuffer extends Install(class {}, [
+    Components.DirtyComponent,
+    Components.ParentComponent,
+    Components.RenderableComponent,
+    Components.SceneComponent,
+    Components.TransformBypassComponent,
+    Components.VisibleComponent
+])
 {
-    type: string = 'SpriteBuffer';
-
-    game: Game;
-    gl: WebGLRenderingContext;
-    renderer: WebGLRenderer;
-    shader: MultiTextureQuadShader;
-
-    visible: boolean = true;
-    renderable: boolean = true;
-    hasTexture: boolean = true;
-    parent: DisplayObjectContainer;
-    children: Container[] = [];
-    texture: Texture = null;
-
-    inputEnabled: boolean = false;
-    inputEnabledChildren: boolean = false;
-
     /**
      * The Array Buffer.
      *
@@ -75,24 +66,33 @@ export default class SpriteBuffer
 
     size: number;
     maxSize: number;
-    dirty: boolean = false;
-
     quadIndexSize: number;
     indexType: GLenum;
+    texture: Texture;
+    gl: WebGLRenderingContext;
+    renderer: WebGLRenderer;
+    shader: MultiTextureQuadShader;
 
-    activeTextures: Texture[];
-
-    constructor (game: Game, maxSize: number)
+    constructor (scene: Scene, maxSize: number)
     {
-        this.game = game;
-        this.renderer = game.renderer;
-        this.gl = game.renderer.gl;
-        this.shader = game.renderer.shader;
+        super();
+
+        this.scene = scene;
+
+        const renderer = scene.game.renderer;
+
+        this.renderer = renderer;
+        this.gl = renderer.gl;
+        this.shader = renderer.shader;
 
         this.resetBuffers(maxSize);
     }
 
-    //  TODO: Split to own function so Shader can share it?
+    willRender (): boolean
+    {
+        return (this.visible && this.renderable && this.size > 0);
+    }
+
     resetBuffers (maxSize: number)
     {
         const gl = this.gl;
@@ -105,7 +105,7 @@ export default class SpriteBuffer
         {
             if (!this.renderer.elementIndexExtension)
             {
-                console.warn('Browser does not support OES uint element index. SpriteBuffer.maxSize cannot exceed 65535');
+                console.warn('OES uint element index unsupported. maxSize cannot exceed 65535');
                 maxSize = 65535;
             }
             else
@@ -151,11 +151,13 @@ export default class SpriteBuffer
         this.size = 0;
         this.maxSize = maxSize;
         this.quadIndexSize = shader.quadIndexSize;
-        this.activeTextures = [];
+        this.texture = null;
     }
 
-    render ()
+    renderWebGL (renderer: WebGLRenderer, shader: MultiTextureQuadShader, startActiveTexture: number)
     {
+        shader.flush();
+
         const gl = this.gl;
 
         this.shader.bindBuffers(this.indexBuffer, this.vertexBuffer);
@@ -168,89 +170,89 @@ export default class SpriteBuffer
             this.dirty = false;
         }
 
-        //  For now we'll allow just the one texture
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.activeTextures[0].glTexture);
-
-        gl.drawElements(gl.TRIANGLES, this.size * this.quadIndexSize, this.indexType, 0);
-    }
-
-    add (source: Sprite)
-    {
-        if (this.size === this.maxSize)
+        if (this.texture.glIndexCounter < startActiveTexture)
         {
-            return;
+            renderer.requestTexture(this.texture);
         }
 
-        const textureIndex = 0;
+        gl.drawElements(gl.TRIANGLES, this.size * this.quadIndexSize, this.indexType, 0);
 
-        this.activeTextures[textureIndex] = source.texture;
+        //  Restore buffers
+        shader.bindBuffers(shader.indexBuffer, shader.vertexBuffer);
+    }
 
-        let offset = this.size * this.shader.quadElementSize;
-
+    /**
+     * Adds a new entry into this SpriteBuffer.
+     * 
+     * A SpriteBuffer can only use one single Texture for all of its entries.
+     * However, they can use any frame from that texture.
+     * 
+     * The most recent sprite added to this Sprite Buffer will determine the
+     * Texture for all of the rest.
+     * 
+     * @param sprites 
+     */
+    add (...sprites: ISprite[]): this
+    {
+        const quadSize: number = this.shader.quadElementSize;
         const F32 = this.vertexViewF32;
         const U32 = this.vertexViewU32;
 
-        const frame = source.frame;
+        sprites.forEach(sprite => {
 
-        const vertices = source.updateVertices();
+            if (this.size < this.maxSize)
+            {
+                sprite.updateVertices(F32, U32, this.size * quadSize);
+        
+                this.texture = sprite.texture;
+        
+                this.size++;
+            }
+    
+        });
 
-        const topLeft = vertices[0];
-        const topRight = vertices[1];
-        const bottomLeft = vertices[2];
-        const bottomRight = vertices[3];
+        this.setDirty(true);
 
-        F32[offset++] = topLeft.x;
-        F32[offset++] = topLeft.y;
-        F32[offset++] = frame.u0;
-        F32[offset++] = frame.v0;
-        F32[offset++] = textureIndex;
-        U32[offset++] = this.shader.packColor(topLeft.color, topLeft.alpha);
-
-        F32[offset++] = bottomLeft.x;
-        F32[offset++] = bottomLeft.y;
-        F32[offset++] = frame.u0;
-        F32[offset++] = frame.v1;
-        F32[offset++] = textureIndex;
-        U32[offset++] = this.shader.packColor(bottomLeft.color, bottomLeft.alpha);
-
-        F32[offset++] = bottomRight.x;
-        F32[offset++] = bottomRight.y;
-        F32[offset++] = frame.u1;
-        F32[offset++] = frame.v1;
-        F32[offset++] = textureIndex;
-        U32[offset++] = this.shader.packColor(bottomRight.color, bottomRight.alpha);
-
-        F32[offset++] = topRight.x;
-        F32[offset++] = topRight.y;
-        F32[offset++] = frame.u1;
-        F32[offset++] = frame.v0;
-        F32[offset++] = textureIndex;
-        U32[offset++] = this.shader.packColor(topRight.color, topRight.alpha);
-
-        this.size++;
-        this.dirty = true;
+        return this;
     }
 
-    numChildren: number = 0;
-
-    willRender (): boolean
+    addAt (offset: number, ...sprites: ISprite[]): this
     {
-        return (this.visible && this.renderable);
+        const quadSize: number = this.shader.quadElementSize;
+        const F32 = this.vertexViewF32;
+        const U32 = this.vertexViewU32;
+
+        let index: number = offset;
+
+        sprites.forEach(sprite => {
+
+            if (index < this.maxSize)
+            {
+                sprite.updateVertices(F32, U32, index * quadSize);
+        
+                this.texture = sprite.texture;
+
+                index++;
+
+                if (index > this.size)
+                {
+                    this.size++;
+                }
+            }
+    
+        });
+
+        this.setDirty(true);
+
+        return this;
     }
 
-    update ()
+    clear (): this
     {
-        // this.game.dirtyFrame++;
-    }
+        this.resetBuffers(this.maxSize);
 
-    preRender ()
-    {
-        // this.game.dirtyFrame++;
+        return this;
     }
-
-    updateTransform ()
-    {
-    }
-
 }
+
+export default interface SpriteBuffer extends ISpriteBuffer {}
