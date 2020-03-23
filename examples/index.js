@@ -260,6 +260,15 @@ void main (void)
         }
     }
 
+    function Matrix2dEqual(mat1, mat2) {
+        return (mat1.a === mat2.a &&
+            mat1.b === mat2.b &&
+            mat1.c === mat2.c &&
+            mat1.d === mat2.d &&
+            mat1.tx === mat2.tx &&
+            mat1.ty === mat2.ty);
+    }
+
     class WebGLRenderer {
         constructor(width, height, resolution = 1) {
             this.contextOptions = {
@@ -399,20 +408,27 @@ void main (void)
                 gl.clearColor(cls[0], cls[1], cls[2], cls[3]);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
+            let prevCamera;
             for (let c = 0; c < sceneList.length; c += 2) {
                 let camera = sceneList[c];
                 let list = sceneList[c + 1];
-                //  TODO - This only needs binding if
-                //  the camera matrix is different to before
-                shader.bind(camera);
+                let len = list.length;
+                if (len === 0) {
+                    continue;
+                }
+                //  This only needs rebinding if the camera matrix is different to before
+                if (!prevCamera || !Matrix2dEqual(camera.worldTransform, prevCamera.worldTransform)) {
+                    shader.flush();
+                    shader.bind(camera);
+                    prevCamera = camera;
+                }
                 //  Process the render list
-                for (let i = 0; i < list.length; i++) {
+                for (let i = 0; i < len; i++) {
                     list[i].renderWebGL(this, shader, this.startActiveTexture);
                 }
-                //  This only needs flushing if the next
-                //  Scene has a different camera matrix
-                shader.flush();
             }
+            //  One final sweep
+            shader.flush();
         }
         requestTexture(texture) {
             const gl = this.gl;
@@ -424,6 +440,17 @@ void main (void)
                 gl.activeTexture(gl.TEXTURE0 + this.currentActiveTexture);
                 gl.bindTexture(gl.TEXTURE_2D, texture.glTexture);
                 this.currentActiveTexture++;
+            }
+            else {
+                //  We're out of textures, so flush the batch and reset them all
+                this.shader.flush();
+                this.activeTextures[0] = texture;
+                texture.glIndex = 0;
+                texture.glIndexCounter++;
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, texture.glTexture);
+                this.currentActiveTexture = 1;
+                this.startActiveTexture++;
             }
         }
     }
@@ -1058,17 +1085,6 @@ void main (void)
         };
     }
 
-    function TransformBypassComponent(Base) {
-        return class TransformComponent extends Base {
-            constructor(...args) {
-                super(args);
-            }
-            updateTransform() {
-                return this;
-            }
-        };
-    }
-
     function LocalToGlobal(transform, x, y, outPoint = new Vec2()) {
         const { a, b, c, d, tx, ty } = transform;
         outPoint.x = (a * x) + (c * y) + tx;
@@ -1219,7 +1235,7 @@ void main (void)
             mat[1] = b;
             mat[4] = c;
             mat[5] = d;
-            //  combinates viewport translation + scrollX/Y
+            //  combines viewport translation + scrollX/Y
             mat[12] = (a * -viewportW) + (c * -viewportH) + (viewportW + tx);
             mat[13] = (b * -viewportW) + (d * -viewportH) + (viewportH + ty);
             //  Store in worldTransform
@@ -1880,134 +1896,6 @@ void main (void)
         23 = topRight.packedColor
     */
 
-    class SpriteBuffer extends Install(class {
-    }, [
-        DirtyComponent,
-        ParentComponent,
-        RenderableComponent,
-        SceneComponent,
-        TransformBypassComponent,
-        VisibleComponent
-    ]) {
-        constructor(scene, maxSize) {
-            super();
-            this.scene = scene;
-            const renderer = scene.game.renderer;
-            this.renderer = renderer;
-            this.gl = renderer.gl;
-            this.shader = renderer.shader;
-            this.resetBuffers(maxSize);
-        }
-        willRender() {
-            return (this.visible && this.renderable && this.size > 0);
-        }
-        resetBuffers(maxSize) {
-            const gl = this.gl;
-            const shader = this.shader;
-            const indexSize = shader.indexSize;
-            this.indexType = gl.UNSIGNED_SHORT;
-            if (maxSize > 65535) {
-                if (!this.renderer.elementIndexExtension) {
-                    console.warn('OES uint element index unsupported. maxSize cannot exceed 65535');
-                    maxSize = 65535;
-                }
-                else {
-                    this.indexType = gl.UNSIGNED_INT;
-                }
-            }
-            let ibo = [];
-            //  Seed the index buffer
-            for (let i = 0; i < (maxSize * indexSize); i += indexSize) {
-                ibo.push(i + 0, i + 1, i + 2, i + 2, i + 3, i + 0);
-            }
-            this.data = new ArrayBuffer(maxSize * shader.quadByteSize);
-            if (this.indexType === gl.UNSIGNED_SHORT) {
-                this.index = new Uint16Array(ibo);
-            }
-            else {
-                this.index = new Uint32Array(ibo);
-            }
-            this.vertexViewF32 = new Float32Array(this.data);
-            this.vertexViewU32 = new Uint32Array(this.data);
-            this.vertexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, this.data, gl.STATIC_DRAW);
-            this.indexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.index, gl.STATIC_DRAW);
-            //  Tidy-up
-            gl.bindBuffer(gl.ARRAY_BUFFER, null);
-            ibo = [];
-            this.size = 0;
-            this.maxSize = maxSize;
-            this.quadIndexSize = shader.quadIndexSize;
-            this.texture = null;
-        }
-        renderWebGL(renderer, shader, startActiveTexture) {
-            shader.flush();
-            const gl = this.gl;
-            this.shader.bindBuffers(this.indexBuffer, this.vertexBuffer);
-            if (this.dirty) {
-                gl.bufferData(gl.ARRAY_BUFFER, this.data, gl.STATIC_DRAW);
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.index, gl.STATIC_DRAW);
-                this.dirty = false;
-            }
-            if (this.texture.glIndexCounter < startActiveTexture) {
-                renderer.requestTexture(this.texture);
-            }
-            gl.drawElements(gl.TRIANGLES, this.size * this.quadIndexSize, this.indexType, 0);
-            //  Restore buffers
-            shader.bindBuffers(shader.indexBuffer, shader.vertexBuffer);
-        }
-        /**
-         * Adds a new entry into this SpriteBuffer.
-         *
-         * A SpriteBuffer can only use one single Texture for all of its entries.
-         * However, they can use any frame from that texture.
-         *
-         * The most recent sprite added to this Sprite Buffer will determine the
-         * Texture for all of the rest.
-         *
-         * @param sprites
-         */
-        add(...sprites) {
-            const quadSize = this.shader.quadElementSize;
-            const F32 = this.vertexViewF32;
-            const U32 = this.vertexViewU32;
-            sprites.forEach(sprite => {
-                if (this.size < this.maxSize) {
-                    sprite.updateVertices(F32, U32, this.size * quadSize);
-                    this.texture = sprite.texture;
-                    this.size++;
-                }
-            });
-            this.setDirty(true);
-            return this;
-        }
-        addAt(offset, ...sprites) {
-            const quadSize = this.shader.quadElementSize;
-            const F32 = this.vertexViewF32;
-            const U32 = this.vertexViewU32;
-            let index = offset;
-            sprites.forEach(sprite => {
-                if (index < this.maxSize) {
-                    sprite.updateVertices(F32, U32, index * quadSize);
-                    this.texture = sprite.texture;
-                    index++;
-                    if (index > this.size) {
-                        this.size++;
-                    }
-                }
-            });
-            this.setDirty(true);
-            return this;
-        }
-        clear() {
-            this.resetBuffers(this.maxSize);
-            return this;
-        }
-    }
-
     class File {
         constructor(key, url, config) {
             this.responseType = 'text';
@@ -2079,80 +1967,6 @@ void main (void)
                 ImageTagLoader(file).then(file => {
                     game.textures.add(key, file.data);
                     resolve(file);
-                }).catch(file => {
-                    reject(file);
-                });
-            });
-        };
-        return file;
-    }
-
-    function SpriteSheetParser (texture, x, y, width, height, frameConfig) {
-        let { frameWidth = null, frameHeight = null, startFrame = 0, endFrame = -1, margin = 0, spacing = 0 } = frameConfig;
-        if (!frameHeight) {
-            frameHeight = frameWidth;
-        }
-        //  If missing we can't proceed
-        if (frameWidth === null) {
-            throw new Error('TextureManager.SpriteSheet: Invalid frameWidth given.');
-        }
-        const row = Math.floor((width - margin + spacing) / (frameWidth + spacing));
-        const column = Math.floor((height - margin + spacing) / (frameHeight + spacing));
-        let total = row * column;
-        if (total === 0) {
-            console.warn('SpriteSheet frame dimensions will result in zero frames.');
-        }
-        if (startFrame > total || startFrame < -total) {
-            startFrame = 0;
-        }
-        if (startFrame < 0) {
-            //  Allow negative skipframes.
-            startFrame = total + startFrame;
-        }
-        if (endFrame !== -1) {
-            total = startFrame + (endFrame + 1);
-        }
-        let fx = margin;
-        let fy = margin;
-        let ax = 0;
-        let ay = 0;
-        for (let i = 0; i < total; i++) {
-            ax = 0;
-            ay = 0;
-            let w = fx + frameWidth;
-            let h = fy + frameHeight;
-            if (w > width) {
-                ax = w - width;
-            }
-            if (h > height) {
-                ay = h - height;
-            }
-            texture.add(i, x + fx, y + fy, frameWidth - ax, frameHeight - ay);
-            fx += frameWidth + spacing;
-            if (fx + frameWidth > width) {
-                fx = margin;
-                fy += frameHeight + spacing;
-            }
-        }
-    }
-
-    function SpriteSheetFile(game, key, url, frameConfig) {
-        const file = new File(key, url);
-        file.load = () => {
-            file.url = GetURL(file.key, file.url, '.png', file.loader);
-            if (file.loader) {
-                file.crossOrigin = file.loader.crossOrigin;
-            }
-            return new Promise((resolve, reject) => {
-                ImageTagLoader(file).then(file => {
-                    const texture = game.textures.add(key, file.data);
-                    if (texture) {
-                        SpriteSheetParser(texture, 0, 0, texture.width, texture.height, frameConfig);
-                        resolve(file);
-                    }
-                    else {
-                        reject(file);
-                    }
                 }).catch(file => {
                     reject(file);
                 });
@@ -2282,57 +2096,46 @@ void main (void)
     class Demo extends Scene {
         constructor(game) {
             super(game);
-            this.cx = 0;
-            this.ccx = 0;
-            this.ccy = 0;
-            // new Stats(game, 'base');
             const loader = new Loader(game);
             loader.setPath('assets');
-            loader.add(SpriteSheetFile(game, 'pacman', 'pacman_by_oz_28x28.png', { frameWidth: 28 }), ImageFile(game, '128', '128x128.png'));
+            loader.add(ImageFile(game, '32x32'), ImageFile(game, '128x128'), ImageFile(game, '512x512'), ImageFile(game, 'ayu'), ImageFile(game, 'balls'), ImageFile(game, 'beball1'), ImageFile(game, 'box-item-boxed'), ImageFile(game, 'brain'), ImageFile(game, 'bubble256'), ImageFile(game, 'car'), ImageFile(game, 'carrot'), ImageFile(game, 'checker'), ImageFile(game, 'clown'), ImageFile(game, 'hotdog'), ImageFile(game, 'lance-overdose-loader-eye'), ImageFile(game, 'lemming'), ImageFile(game, 'logo'), ImageFile(game, 'mushroom-32x32'), ImageFile(game, 'muzzleflash2'), ImageFile(game, 'orange-cat1'), ImageFile(game, 'orb-blue'), ImageFile(game, 'orb-red'), ImageFile(game, 'pacman_by_oz_28x28'), ImageFile(game, 'phaser-ship'), ImageFile(game, 'phaser_tiny'), ImageFile(game, 'red'), ImageFile(game, 'rocket'), ImageFile(game, 'shinyball'), ImageFile(game, 'skull'), ImageFile(game, 'sonic'), ImageFile(game, 'star'));
+            loader.on('progress', (progress, totalCompleted, totalQueued) => {
+                console.log(progress, ' - (' + totalCompleted + ' / ' + totalQueued + ')');
+            });
             loader.start(() => this.create());
         }
         create() {
-            const pacman = new Sprite(this, 400, 300, 'pacman', 0);
-            const buffer = new SpriteBuffer(this, 65535);
-            for (let i = 0; i < buffer.maxSize; i++) {
-                let x = -1600 + Math.floor(Math.random() * 3200);
-                let y = -1200 + Math.floor(Math.random() * 2400);
-                let f = Math.floor(Math.random() * 11);
-                pacman.setPosition(x, y);
-                pacman.setFrame(f);
-                buffer.add(pacman);
-            }
-            this.world.addChild(buffer);
-        }
-        update(delta) {
-            this.ccx = Math.sin(this.cx) * 800;
-            this.ccy = Math.cos(this.cx) * 800;
-            this.world.camera.x = Math.floor(this.ccx);
-            this.world.camera.y = Math.floor(this.ccy);
-            this.cx += delta / 2;
+            this.game.renderer.optimizeRedraw = false;
+            this.game.textures.textures.forEach((texture, key) => {
+                let x = 50 + Math.floor(Math.random() * 700);
+                let y = 50 + Math.floor(Math.random() * 500);
+                let s = new Sprite(this, x, y, key);
+                this.world.addChild(s);
+            });
         }
     }
-    function demo37 () {
-        let game = new Game({
+    function demo38 () {
+        const game = new Game({
             width: 800,
             height: 600,
             backgroundColor: 0x000033,
             parent: 'gameParent',
             scene: Demo
         });
+        window['game'] = game;
     }
 
     // import demo1 from './demo1'; // test single sprite
-    demo37();
+    demo38();
     //  Next steps:
     //  * Camera tint + alpha (as shader uniform)
     //  * Camera background color (instead of renderer bgc)
-    //  * Multi Texture re-use old texture IDs when count > max supported
     //  * Single Texture shader
     //  * Tile Layer
     //  * Sprite Sheet from Atlas Frame extractor
     //  * Instead of a Quad class, try a class that can have any number of vertices in it (ala Rope), or any vertex moved
     //  Done:
+    //  X Multi Texture re-use old texture IDs when count > max supported
     //  X Camera moving needs to dirty the renderer
     //  X Load json / csv / xml on their own
     //  X Base64 Loader Test

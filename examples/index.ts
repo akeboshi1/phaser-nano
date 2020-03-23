@@ -34,15 +34,15 @@
 // import demo34 from './demo34'; // Loader Progress test
 // import demo35 from './demo35'; // Mouse Input - Hit Test
 // import demo36 from './demo36'; // Mouse Input - Hit Test Children
-import demo37 from './demo37'; // Sprite Buffer
+// import demo37 from './demo37'; // Sprite Buffer
+import demo38 from './demo38'; // Texture > max Texture switch
 
-demo37();
+demo38();
 
 //  Next steps:
 
 //  * Camera tint + alpha (as shader uniform)
 //  * Camera background color (instead of renderer bgc)
-//  * Multi Texture re-use old texture IDs when count > max supported
 //  * Single Texture shader
 //  * Tile Layer
 //  * Sprite Sheet from Atlas Frame extractor
@@ -50,6 +50,7 @@ demo37();
 
 //  Done:
 
+//  X Multi Texture re-use old texture IDs when count > max supported
 //  X Camera moving needs to dirty the renderer
 //  X Load json / csv / xml on their own
 //  X Base64 Loader Test
