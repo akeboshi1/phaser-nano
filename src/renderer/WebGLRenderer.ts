@@ -3,7 +3,8 @@ import MultiTextureQuadShader from './MultiTextureQuadShader';
 import Texture from '../textures/Texture';
 import Camera from '../gameobjects/Camera';
 import IRenderable from '../gameobjects/IRenderable';
-import ISprite from '../gameobjects/ISprite';
+import Matrix2dEqual from '../math/Matrix2dEqual';
+import ICamera from '../gameobjects/ICamera';
 
 export default class WebGLRenderer
 {
@@ -233,7 +234,6 @@ export default class WebGLRenderer
         const shader = this.shader;
 
         //  CLS
-
         gl.viewport(0, 0, this.width, this.height);
 
         gl.enable(gl.BLEND);
@@ -247,25 +247,39 @@ export default class WebGLRenderer
             gl.clear(gl.COLOR_BUFFER_BIT);
         }
 
+        let prevCamera: Camera;
+
         for (let c: number = 0; c < sceneList.length; c += 2)
         {
-            let camera = sceneList[c];
+            let camera: ICamera = sceneList[c];
             let list: IRenderable[] = sceneList[c + 1];
 
-            //  TODO - This only needs binding if
-            //  the camera matrix is different to before
-            shader.bind(camera);
+            let len = list.length;
+
+            if (len === 0)
+            {
+                continue;
+            }
+
+            //  This only needs rebinding if the camera matrix is different to before
+            if (!prevCamera || !Matrix2dEqual(camera.worldTransform, prevCamera.worldTransform))
+            {
+                shader.flush();
+
+                shader.bind(camera);
+
+                prevCamera = camera;
+            }
 
             //  Process the render list
-            for (let i: number = 0; i < list.length; i++)
+            for (let i: number = 0; i < len; i++)
             {
                 list[i].renderWebGL(this, shader, this.startActiveTexture);
             }
-
-            //  This only needs flushing if the next
-            //  Scene has a different camera matrix
-            shader.flush();
         }
+
+        //  One final sweep
+        shader.flush();
     }
 
     requestTexture (texture: Texture)
@@ -288,8 +302,19 @@ export default class WebGLRenderer
         }
         else
         {
-            //  TODO
-            //  We've run out, flush + recycle the oldest one
+            //  We're out of textures, so flush the batch and reset them all
+            this.shader.flush();
+
+            this.activeTextures[0] = texture;
+
+            texture.glIndex = 0;
+            texture.glIndexCounter++;
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texture.glTexture);
+
+            this.currentActiveTexture = 1;
+            this.startActiveTexture++;
         }
     }
 }
