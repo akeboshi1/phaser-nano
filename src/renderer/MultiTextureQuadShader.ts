@@ -273,25 +273,32 @@ export default class MultiTextureQuadShader
 
         let src: string = '';
 
-        for (let i: number = 0; i < maxTextures; i++)
+        if (maxTextures > 1)
         {
-            if (i > 0)
+            for (let i: number = 0; i < maxTextures; i++)
             {
-                src += '\n    else ';
+                if (i > 0)
+                {
+                    src += '\nelse ';
+                }
+        
+                if (i < maxTextures - 1)
+                {
+                    src += `if (vTextureId < ${i}.5)`;
+                }
+        
+                src += '\n{';
+                src += `\n    color = texture2D(uTexture[${i}], vTextureCoord);`;
+                src += '\n}';
             }
     
-            if (i < maxTextures - 1)
-            {
-                src += `if (vTextureId < ${i}.5)`;
-            }
-    
-            src += '\n    {';
-            src += `\n        color = texture2D(uTexture[${i}], vTextureCoord);`;
-            src += '\n    }';
+            fragmentShaderSource = fragmentShaderSource.replace(/%count%/gi, `${maxTextures}`);
+            fragmentShaderSource = fragmentShaderSource.replace(/%forloop%/gi, src);
         }
-
-        fragmentShaderSource = fragmentShaderSource.replace(/%count%/gi, `${maxTextures}`);
-        fragmentShaderSource = fragmentShaderSource.replace(/%forloop%/gi, src);
+        else
+        {
+            src = 'color = texture2D(uTexture[0], vTextureCoord);';
+        }
 
         //  Create the shaders
 
@@ -329,6 +336,7 @@ export default class MultiTextureQuadShader
         gl.enableVertexAttribArray(vertexTextureIndex);
         gl.enableVertexAttribArray(vertexColor);
 
+        //  TODO - Can optimize size by using same variable names
         this.attribs = {
             position: vertexPosition,
             textureCoord: vertexTextureCoord,
@@ -343,7 +351,7 @@ export default class MultiTextureQuadShader
         };
     }
 
-    bind (camera: ICamera)
+    bind (projectionMatrix: Float32Array, cameraMatrix: Float32Array)
     {
         const gl = this.gl;
         const renderer = this.renderer;
@@ -351,8 +359,8 @@ export default class MultiTextureQuadShader
 
         gl.useProgram(this.program);
 
-        gl.uniformMatrix4fv(uniforms.projectionMatrix, false, renderer.projectionMatrix);
-        gl.uniformMatrix4fv(uniforms.cameraMatrix, false, camera.matrix);
+        gl.uniformMatrix4fv(uniforms.projectionMatrix, false, projectionMatrix);
+        gl.uniformMatrix4fv(uniforms.cameraMatrix, false, cameraMatrix);
         gl.uniform1iv(uniforms.textureLocation, renderer.textureIndex);
 
         this.bindBuffers(this.indexBuffer, this.vertexBuffer);
@@ -377,13 +385,13 @@ export default class MultiTextureQuadShader
         this.count = 0;
     }
 
-    flush ()
+    flush (): boolean
     {
         const count = this.count;
 
         if (count === 0)
         {
-            return;
+            return false;
         }
 
         const gl = this.gl;
@@ -403,6 +411,8 @@ export default class MultiTextureQuadShader
         gl.drawElements(gl.TRIANGLES, count * this.quadIndexSize, gl.UNSIGNED_SHORT, 0);
 
         this.count = 0;
+
+        return true;
     }
 
 }
