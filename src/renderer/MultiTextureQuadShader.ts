@@ -1,6 +1,5 @@
 import WebGLRenderer from './WebGLRenderer';
 import ISpriteMultiShader from './ISpriteMultiShader';
-import ICamera from '../gameobjects/ICamera';
 
 const shaderSource = {
 
@@ -288,7 +287,7 @@ export default class MultiTextureQuadShader
                 }
         
                 src += '\n{';
-                src += `\n    color = texture2D(uTexture[${i}], vTextureCoord);`;
+                src += `\n  color = texture2D(uTexture[${i}], vTextureCoord);`;
                 src += '\n}';
             }
     
@@ -414,5 +413,4 @@ export default class MultiTextureQuadShader
 
         return true;
     }
-
 }
