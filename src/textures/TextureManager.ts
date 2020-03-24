@@ -1,5 +1,6 @@
 import Texture from './Texture';
 import Game from '../Game';
+import CreateCanvas from './CreateCanvas';
 
 export default class TextureManager
 {
@@ -11,6 +12,23 @@ export default class TextureManager
         this.game = game;
 
         this.textures = new Map();
+
+        this.createDefaultTextures();
+    }
+
+    private createDefaultTextures ()
+    {
+        this.add('__BLANK', new Texture('', CreateCanvas(32, 32).canvas));
+
+        const missing = CreateCanvas(32, 32);
+
+        missing.strokeStyle = '#0f0';
+        missing.moveTo(0, 0);
+        missing.lineTo(32, 32);
+        missing.stroke();
+        missing.strokeRect(0.5, 0.5, 31, 31);
+
+        this.add('__MISSING', new Texture('', missing.canvas));
     }
 
     get (key: string): Texture
