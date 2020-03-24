@@ -3,8 +3,6 @@ import Texture from './Texture';
 
 export default function GridTexture (color1: string, color2: string, width: number = 32, height: number = 32, cols: number = 2, rows: number = 2): Texture
 {
-    let texture = null;
-
     const ctx = CreateCanvas(width, height);
 
     const colWidth = width / cols;
@@ -23,5 +21,5 @@ export default function GridTexture (color1: string, color2: string, width: numb
         }
     }
 
-    return texture = new Texture('', ctx.canvas);
+    return new Texture('', ctx.canvas);
 }
