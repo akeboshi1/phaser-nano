@@ -1,16 +1,14 @@
 import Texture from './Texture';
-import Game from '../Game';
 import CreateCanvas from './CreateCanvas';
+import CreateGLTexture from '../renderer/CreateGLTexture';
+import GL from '../renderer/GL';
 
 export default class TextureManager
 {
     textures: Map<string, Texture>;
-    game: Game;
 
-    constructor (game: Game)
+    constructor ()
     {
-        this.game = game;
-
         this.textures = new Map();
 
         this.createDefaultTextures();
@@ -67,7 +65,7 @@ export default class TextureManager
 
             if (!texture.glTexture)
             {
-                texture.glTexture = this.game.renderer.createGLTexture(texture.image);
+                texture.glTexture = CreateGLTexture(GL.get(), texture.image);
             }
 
             this.textures.set(key, texture);

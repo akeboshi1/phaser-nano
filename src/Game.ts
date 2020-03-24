@@ -80,7 +80,7 @@ export default class Game extends EventEmitter
         AddToDOM(renderer.canvas, config.parent);
 
         this.renderer = renderer;
-        this.textures = new TextureManager(this);
+        this.textures = new TextureManager();
         this.scenes = new SceneManager(this);
 
         this.banner(this.VERSION);
