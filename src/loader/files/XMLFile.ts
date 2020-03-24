@@ -20,6 +20,8 @@ export default function XMLFile (game: Game, key: string, url?: string): File
 
                 if (xml !== null)
                 {
+                    file.data = xml;
+
                     if (!file.skipCache)
                     {
                         game.cache.xml.set(file.key, xml);
