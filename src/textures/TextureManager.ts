@@ -46,8 +46,10 @@ export default class TextureManager
                 texture = new Texture(key, source);
             }
 
-            // TODO: Make this happen at render time
-            texture.glTexture = this.game.renderer.createGLTexture(texture.image);
+            if (!texture.glTexture)
+            {
+                texture.glTexture = this.game.renderer.createGLTexture(texture.image);
+            }
 
             this.textures.set(key, texture);
         }
