@@ -1,6 +1,9 @@
 import Texture from './Texture';
 import ISprite from '../gameobjects/ISprite';
 import WebGLRenderer from '../renderer/WebGLRenderer';
+import Ortho from '../renderer/Ortho';
+import CreateFramebuffer from '../renderer/CreateFramebuffer';
+import GL from '../renderer/GL';
 
 export default class RenderTexture extends Texture
 {
@@ -14,12 +17,12 @@ export default class RenderTexture extends Texture
 
         this.renderer = renderer;
 
-        const [ texture, framebuffer ] = renderer.createFramebuffer(width, height);
+        const [ texture, framebuffer ] = CreateFramebuffer(GL.get(), width, height);
 
         this.glTexture = texture;
         this.glFramebuffer = framebuffer;
 
-        this.projectionMatrix = renderer.ortho(width, height, -10000, 10000);
+        this.projectionMatrix = Ortho(width, height);
         this.cameraMatrix = new Float32Array([ 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, height, 0, 1 ]);
     }
 
