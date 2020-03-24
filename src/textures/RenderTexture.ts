@@ -38,22 +38,6 @@ export default class RenderTexture extends Texture
         return this;
     }
 
-    fill (red: number = 0, green: number = 0, blue: number = 0, alpha: number = 0): this
-    {
-        const renderer = this.renderer;
-        const gl = renderer.gl;
-
-        renderer.reset(this.glFramebuffer, this.width, this.height);
-
-        //  
-        // gl.clearColor(red, green, blue, alpha);
-        // gl.clear(gl.COLOR_BUFFER_BIT);
-
-        renderer.reset();
-
-        return this;
-    }
-
     batchStart (): this
     {
         const renderer = this.renderer;
