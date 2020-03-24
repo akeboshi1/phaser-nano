@@ -8,5 +8,5 @@ export default function SolidColorTexture (color: string, width: number = 32, he
     ctx.fillStyle = color;
     ctx.fillRect(0, 0, width, height);
 
-    return new Texture('', ctx.canvas);
+    return new Texture(ctx.canvas);
 }

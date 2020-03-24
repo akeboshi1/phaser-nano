@@ -1,5 +1,4 @@
 import Texture from './Texture';
-import Scene from '../Scene';
 import ISprite from '../gameobjects/ISprite';
 import WebGLRenderer from '../renderer/WebGLRenderer';
 
@@ -9,21 +8,19 @@ export default class RenderTexture extends Texture
     cameraMatrix: Float32Array;
     projectionMatrix: Float32Array;
 
-    constructor (scene: Scene, key: string, width: number = 256, height: number = 256)
+    constructor (renderer: WebGLRenderer, width: number = 256, height: number = width)
     {
-        super(key, null, width, height);
+        super(null, width, height);
 
-        this.renderer = scene.game.renderer;
+        this.renderer = renderer;
 
-        const [ texture, framebuffer ] = this.renderer.createFramebuffer(width, height);
+        const [ texture, framebuffer ] = renderer.createFramebuffer(width, height);
 
         this.glTexture = texture;
         this.glFramebuffer = framebuffer;
 
-        this.projectionMatrix = this.renderer.ortho(width, height, -10000, 10000);
+        this.projectionMatrix = renderer.ortho(width, height, -10000, 10000);
         this.cameraMatrix = new Float32Array([ 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, height, 0, 1 ]);
-
-        scene.game.textures.add(key, this);
     }
 
     cls (): this

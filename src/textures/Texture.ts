@@ -3,6 +3,7 @@ import Frame from './Frame';
 
 export default class Texture
 {
+    //  Unique identifier of this Texture within the Texture Manager
     key: string;
 
     width: number;
@@ -22,15 +23,13 @@ export default class Texture
 
     data: any;
 
-    constructor (key: string, image?: TexImageSource, width?: number, height?: number)
+    constructor (image?: TexImageSource, width?: number, height?: number)
     {
         if (image)
         {
             width = image.width;
             height = image.height;
         }
-
-        this.key = key;
 
         this.image = image;
 

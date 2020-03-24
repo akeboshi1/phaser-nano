@@ -18,7 +18,7 @@ export default class TextureManager
 
     private createDefaultTextures ()
     {
-        this.add('__BLANK', new Texture('', CreateCanvas(32, 32).canvas));
+        this.add('__BLANK', new Texture(CreateCanvas(32, 32).canvas));
 
         const missing = CreateCanvas(32, 32);
 
@@ -28,7 +28,7 @@ export default class TextureManager
         missing.stroke();
         missing.strokeRect(0.5, 0.5, 31, 31);
 
-        this.add('__MISSING', new Texture('', missing.canvas));
+        this.add('__MISSING', new Texture(missing.canvas));
     }
 
     get (key: string): Texture
@@ -57,12 +57,13 @@ export default class TextureManager
             if (source instanceof Texture)
             {
                 texture = source;
-                texture.key = key;
             }
             else
             {
-                texture = new Texture(key, source);
+                texture = new Texture(source);
             }
+
+            texture.key = key;
 
             if (!texture.glTexture)
             {

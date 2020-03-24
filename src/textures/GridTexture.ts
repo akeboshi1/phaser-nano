@@ -21,5 +21,5 @@ export default function GridTexture (color1: string, color2: string, width: numb
         }
     }
 
-    return new Texture('', ctx.canvas);
+    return new Texture(ctx.canvas);
 }
