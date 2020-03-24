@@ -38,10 +38,12 @@
 // import demo38 from './demo38'; // Texture > max Texture switch
 // import demo39 from './demo39'; // Bitmap Text File loader
 // import demo40 from './demo40'; // Bitmap Text File Game Object
-import demo41 from './demo41'; // Render Texture
+// import demo41 from './demo41'; // Render Texture
+// import demo42 from './demo42'; // Render Texture draw
+// import demo43 from './demo43'; // Render Texture draw with atlas frame
+import demo44 from './demo44'; // Text Game Object
 
-// demo36();
-demo41();
+demo44();
 
 //  Next steps:
 
@@ -49,7 +51,6 @@ demo41();
 //  * Destroy a Game instance
 //  * Camera tint + alpha (as shader uniform)
 //  * Camera background color (instead of renderer bgc)
-//  * Render Texture (basic frame buffer + draw ability)
 //  * Bitmap Text Game Object
 //  * Tile Layer (using sprite buffer approach + culling?)
 //  * Sprite Sheet from Atlas Frame extractor
@@ -57,6 +58,7 @@ demo41();
 
 //  Done:
 
+//  X Render Texture (basic frame buffer + draw ability)
 //  X Single Texture shader
 //  X Multi Texture re-use old texture IDs when count > max supported
 //  X Camera moving needs to dirty the renderer

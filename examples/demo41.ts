@@ -26,11 +26,10 @@ class Demo extends Scene
     {
         this.game.renderer.optimizeRedraw = false;
 
+        const sprite1 = new Sprite(this, 400, 300, 'hotdog');
         const sprite2 = new Sprite(this, 400, 300, 'uv');
 
-        const rt = new RenderTexture(this, 'hello', 400, 600);
-
-        this.game.textures.add(rt.key, rt);
+        const rt = new RenderTexture(this.game.renderer, 400, 600);
 
         rt.batchStart();
 
@@ -41,15 +40,14 @@ class Demo extends Scene
 
             sprite2.setPosition(x, y);
 
-            // rt.draw(sprite2);
             rt.batchDraw(sprite2);
         }
 
         rt.batchEnd();
 
-        const spriteWithRT = new Sprite(this, 400, 300, 'hello');
+        const spriteWithRT = new Sprite(this, 400, 300, rt);
 
-        this.world.addChild(spriteWithRT);
+        this.world.addChild(spriteWithRT, sprite1);
     }
 }
 

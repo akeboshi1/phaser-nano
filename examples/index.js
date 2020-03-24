@@ -179,7 +179,7 @@ void main (void)
                         src += `if (vTextureId < ${i}.5)`;
                     }
                     src += '\n{';
-                    src += `\n    color = texture2D(uTexture[${i}], vTextureCoord);`;
+                    src += `\n  color = texture2D(uTexture[${i}], vTextureCoord);`;
                     src += '\n}';
                 }
                 fragmentShaderSource = fragmentShaderSource.replace(/%count%/gi, `${maxTextures}`);
@@ -277,6 +277,25 @@ void main (void)
             mat1.ty === mat2.ty);
     }
 
+    function Ortho(width, height, near = -1, far = 1) {
+        const m00 = -2 * (1 / -width);
+        const m11 = -2 * (1 / height);
+        const m22 = 2 * (1 / (near - far));
+        return new Float32Array([m00, 0, 0, 0, 0, m11, 0, 0, 0, 0, m22, 0, -1, 1, 0, 1]);
+    }
+
+    let gl;
+    function get() {
+        return gl;
+    }
+    function set(context) {
+        gl = context;
+    }
+    var GL = {
+        get,
+        set
+    };
+
     class WebGLRenderer {
         constructor(width, height, resolution = 1) {
             this.contextOptions = {
@@ -289,6 +308,8 @@ void main (void)
             };
             this.clearColor = [0, 0, 0, 1];
             this.maxTextures = 0;
+            this.currentActiveTexture = 0;
+            this.startActiveTexture = 0;
             this.clearBeforeRender = true;
             this.optimizeRedraw = true;
             this.autoResize = true;
@@ -305,15 +326,15 @@ void main (void)
         }
         initContext() {
             const gl = this.canvas.getContext('webgl', this.contextOptions);
+            GL.set(gl);
             this.gl = gl;
             this.elementIndexExtension = gl.getExtension('OES_element_index_uint');
             this.getMaxTextures();
-            // https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/depthFunc
-            // gl.enable(gl.DEPTH_TEST);
-            // gl.depthFunc(gl.LESS);
             if (this.shader) {
                 this.shader.gl = gl;
             }
+            gl.disable(gl.DEPTH_TEST);
+            gl.disable(gl.CULL_FACE);
             this.resize(this.width, this.height, this.resolution);
         }
         resize(width, height, resolution = 1) {
@@ -328,13 +349,7 @@ void main (void)
                 canvas.style.height = this.height / resolution + 'px';
             }
             this.gl.viewport(0, 0, this.width, this.height);
-            this.projectionMatrix = this.ortho(width, height, -10000, 10000);
-        }
-        ortho(width, height, near, far) {
-            const m00 = -2 * (1 / -width);
-            const m11 = -2 * (1 / height);
-            const m22 = 2 * (1 / (near - far));
-            return new Float32Array([m00, 0, 0, 0, 0, m11, 0, 0, 0, 0, m22, 0, -1, 1, 0, 1]);
+            this.projectionMatrix = Ortho(width, height);
         }
         onContextLost(event) {
             event.preventDefault();
@@ -370,64 +385,28 @@ void main (void)
             this.textureIndex = Array.from(Array(maxTextures).keys());
             this.activeTextures = Array(maxTextures);
             this.currentActiveTexture = 0;
-            this.startActiveTexture = 0;
         }
-        isSizePowerOfTwo(width, height) {
-            if (width < 1 || height < 1) {
-                return false;
-            }
-            return ((width & (width - 1)) === 0) && ((height & (height - 1)) === 0);
-        }
-        createFramebuffer(width, height) {
+        reset(framebuffer = null, width = this.width, height = this.height) {
             const gl = this.gl;
-            const texture = this.createGLTexture(null, width, height);
-            const framebuffer = gl.createFramebuffer();
             gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            return [texture, framebuffer];
-        }
-        createGLTexture(source, width, height) {
-            const gl = this.gl;
-            const glTexture = gl.createTexture();
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, glTexture);
-            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-            if (source) {
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
-                width = source.width;
-                height = source.height;
-            }
-            else {
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-            }
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            const pot = (source && this.isSizePowerOfTwo(width, height));
-            const wrap = (pot) ? gl.REPEAT : gl.CLAMP_TO_EDGE;
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-            if (pot) {
-                gl.generateMipmap(gl.TEXTURE_2D);
-            }
-            return glTexture;
+            gl.viewport(0, 0, width, height);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            this.currentActiveTexture = 0;
+            this.startActiveTexture++;
         }
         render(sceneList, dirtyFrame) {
             if (this.contextLost) {
                 return;
             }
             const gl = this.gl;
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            //  This is only here because if we don't do _something_ with the context, GL Spector can't see it.
+            //  Technically, we could move it below the dirty bail-out below.
+            this.reset();
             if (this.optimizeRedraw && dirtyFrame === 0) {
                 return;
             }
-            this.currentActiveTexture = 0;
-            this.startActiveTexture++;
             const shader = this.shader;
-            //  CLS
-            gl.viewport(0, 0, this.width, this.height);
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
             const cls = this.clearColor;
             if (this.clearBeforeRender) {
                 gl.clearColor(cls[0], cls[1], cls[2], cls[3]);
@@ -1007,14 +986,13 @@ void main (void)
     }
 
     class Texture {
-        constructor(key, image, width, height) {
+        constructor(image, width, height) {
             this.glIndex = 0;
             this.glIndexCounter = -1;
             if (image) {
                 width = image.width;
                 height = image.height;
             }
-            this.key = key;
             this.image = image;
             this.width = width;
             this.height = height;
@@ -1672,10 +1650,59 @@ void main (void)
         }
     }
 
+    function CreateCanvas(width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        return canvas.getContext('2d');
+    }
+
+    function IsPowerOfTwo(width, height) {
+        if (width < 1 || height < 1) {
+            return false;
+        }
+        return ((width & (width - 1)) === 0) && ((height & (height - 1)) === 0);
+    }
+
+    function CreateGLTexture(gl, source, width, height) {
+        const glTexture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, glTexture);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        if (source) {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+            width = source.width;
+            height = source.height;
+        }
+        else {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        }
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        const pot = (source && IsPowerOfTwo(width, height));
+        const wrap = (pot) ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+        if (pot) {
+            gl.generateMipmap(gl.TEXTURE_2D);
+        }
+        return glTexture;
+    }
+
     class TextureManager {
-        constructor(game) {
-            this.game = game;
+        constructor() {
             this.textures = new Map();
+            this.createDefaultTextures();
+        }
+        createDefaultTextures() {
+            this.add('__BLANK', new Texture(CreateCanvas(32, 32).canvas));
+            const missing = CreateCanvas(32, 32);
+            missing.strokeStyle = '#0f0';
+            missing.moveTo(0, 0);
+            missing.lineTo(32, 32);
+            missing.stroke();
+            missing.strokeRect(0.5, 0.5, 31, 31);
+            this.add('__MISSING', new Texture(missing.canvas));
         }
         get(key) {
             if (this.textures.has(key)) {
@@ -1693,13 +1720,13 @@ void main (void)
             if (!this.textures.has(key)) {
                 if (source instanceof Texture) {
                     texture = source;
-                    texture.key = key;
                 }
                 else {
-                    texture = new Texture(key, source);
+                    texture = new Texture(source);
                 }
+                texture.key = key;
                 if (!texture.glTexture) {
-                    texture.glTexture = this.game.renderer.createGLTexture(texture.image);
+                    texture.glTexture = CreateGLTexture(GL.get(), texture.image);
                 }
                 this.textures.set(key, texture);
             }
@@ -1743,7 +1770,7 @@ void main (void)
             renderer.setBackgroundColor(config.backgroundColor);
             AddToDOM(renderer.canvas, config.parent);
             this.renderer = renderer;
-            this.textures = new TextureManager(this);
+            this.textures = new TextureManager();
             this.scenes = new SceneManager(this);
             this.banner(this.VERSION);
             this.scenes.boot([].concat(config.scene));
@@ -1796,6 +1823,13 @@ void main (void)
         destroy() {
             //  TODO
         }
+    }
+
+    function SolidColorTexture(color = 'rgba(0,0,0,0)', width = 32, height = 32) {
+        const ctx = CreateCanvas(width, height);
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, width, height);
+        return new Texture(ctx.canvas);
     }
 
     function PackColor (rgb, alpha) {
@@ -1928,286 +1962,52 @@ void main (void)
         23 = topRight.packedColor
     */
 
-    class RenderTexture extends Texture {
-        constructor(scene, key, width = 256, height = 256) {
-            super(key, null, width, height);
-            this.renderer = scene.game.renderer;
-            const [texture, framebuffer] = this.renderer.createFramebuffer(width, height);
-            this.glTexture = texture;
-            this.glFramebuffer = framebuffer;
-            this.projectionMatrix = this.renderer.ortho(width, height, -10000, 10000);
-            this.cameraMatrix = new Float32Array([1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, height, 0, 1]);
-        }
-        cls(red = 0, green = 0, blue = 0, alpha = 0) {
-            const renderer = this.renderer;
-            const gl = renderer.gl;
-            gl.bindFramebuffer(gl.FRAMEBUFFER, this.glFramebuffer);
-            // gl.viewport(0, 0, this.width, this.height);
-            gl.clearColor(red, green, blue, alpha);
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            return this;
-        }
-        batchStart() {
-            const renderer = this.renderer;
-            const gl = renderer.gl;
-            const shader = renderer.shader;
-            gl.bindFramebuffer(gl.FRAMEBUFFER, this.glFramebuffer);
-            renderer.currentActiveTexture = 0;
-            renderer.startActiveTexture++;
-            shader.bind(this.projectionMatrix, this.cameraMatrix);
-            return this;
-        }
-        batchDraw(...sprites) {
-            const renderer = this.renderer;
-            const shader = renderer.shader;
-            for (let i = 0; i < sprites.length; i++) {
-                sprites[i].renderWebGL(renderer, shader, renderer.startActiveTexture);
-            }
-            return this;
-        }
-        batchEnd() {
-            const renderer = this.renderer;
-            const gl = renderer.gl;
-            const shader = renderer.shader;
-            shader.flush();
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            return this;
-        }
-        draw(...sprites) {
-            this.batchStart();
-            this.batchDraw(...sprites);
-            this.batchEnd();
-            return this;
+    function UpdateGLTexture(gl, source, dstTexture, flipY = false) {
+        const width = source.width;
+        const height = source.height;
+        if (width > 0 && height > 0) {
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, dstTexture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flipY);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
         }
     }
 
-    class File {
-        constructor(key, url, config) {
-            this.responseType = 'text';
-            this.crossOrigin = undefined;
-            this.skipCache = false;
-            this.hasLoaded = false;
-            this.key = key;
-            this.url = url;
-            this.config = config;
+    class Text extends Sprite {
+        constructor(scene, x, y, text) {
+            super(scene, x, y, SolidColorTexture());
+            this._text = text;
+            this._canvas = this.texture.image;
+            this._ctx = this._canvas.getContext('2d');
+            this.texture.glTexture = CreateGLTexture(GL.get(), this._canvas);
+            this.updateText();
         }
-    }
-
-    function ImageTagLoader(file) {
-        file.data = new Image();
-        if (file.crossOrigin) {
-            file.data.crossOrigin = file.crossOrigin;
+        updateText() {
+            const canvas = this._canvas;
+            const ctx = this._ctx;
+            ctx.font = 'Courier';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, 256, 256);
+            ctx.fillStyle = '#ff0000';
+            ctx.fillText(this._text, 0, 10);
+            UpdateGLTexture(GL.get(), canvas, this.texture.glTexture);
         }
-        return new Promise((resolve, reject) => {
-            file.data.onload = () => {
-                if (file.data.onload) {
-                    file.data.onload = null;
-                    file.data.onerror = null;
-                    resolve(file);
-                }
-            };
-            file.data.onerror = (event) => {
-                if (file.data.onload) {
-                    file.data.onload = null;
-                    file.data.onerror = null;
-                    file.error = event;
-                    reject(file);
-                }
-            };
-            file.data.src = file.url;
-            // Image is immediately-available or cached
-            if (file.data.complete && file.data.width && file.data.height) {
-                file.data.onload = null;
-                file.data.onerror = null;
-                resolve(file);
-            }
-        });
-    }
-
-    function GetURL(key, url, extension, loader) {
-        if (!url) {
-            url = key + extension;
-        }
-        if (url.match(/^(?:blob:|data:|http:\/\/|https:\/\/|\/\/)/)) {
-            return url;
-        }
-        else {
-            if (loader) {
-                return loader.baseURL + loader.path + url;
-            }
-            else {
-                return url;
-            }
-        }
-    }
-
-    function ImageFile(game, key, url) {
-        const file = new File(key, url);
-        file.load = () => {
-            file.url = GetURL(file.key, file.url, '.png', file.loader);
-            if (file.loader) {
-                file.crossOrigin = file.loader.crossOrigin;
-            }
-            return new Promise((resolve, reject) => {
-                ImageTagLoader(file).then(file => {
-                    game.textures.add(key, file.data);
-                    resolve(file);
-                }).catch(file => {
-                    reject(file);
-                });
-            });
-        };
-        return file;
-    }
-
-    class Loader extends EventEmitter {
-        constructor(game) {
-            super();
-            this.baseURL = '';
-            this.path = '';
-            this.crossOrigin = 'anonymous';
-            //  -1 means load everything at once
-            this.maxParallelDownloads = -1;
-            this.isLoading = false;
-            this.game = game;
-            this.reset();
-        }
-        reset() {
-            this.isLoading = false;
-            this.queue = new Set();
-            this.inflight = new Set();
-            this.completed = new Set();
-            this.progress = 0;
-        }
-        add(...file) {
-            file.forEach(entity => {
-                entity.loader = this;
-                this.queue.add(entity);
-            });
-            return this;
-        }
-        start(onComplete) {
-            if (this.isLoading) {
-                return;
-            }
-            this.completed.clear();
-            this.progress = 0;
-            if (this.queue.size > 0) {
-                this.isLoading = true;
-                this.onComplete = onComplete;
-                this.emit('start');
-                this.nextFile();
-            }
-            else {
-                this.progress = 1;
-                this.emit('complete');
-                onComplete();
-            }
-            return this;
-        }
-        nextFile() {
-            let limit = this.queue.size;
-            if (this.maxParallelDownloads !== -1) {
-                limit = Math.min(limit, this.maxParallelDownloads) - this.inflight.size;
-            }
-            if (limit) {
-                // console.log('Batching', limit, 'files to download');
-                const iterator = this.queue.values();
-                while (limit > 0) {
-                    const file = iterator.next().value;
-                    // console.log('Loader.nextFile', file.key, '=>', file.url);
-                    this.inflight.add(file);
-                    this.queue.delete(file);
-                    file.load().then((file) => this.fileComplete(file)).catch((file) => this.fileError(file));
-                    limit--;
-                }
-            }
-            else if (this.inflight.size === 0) {
-                this.stop();
-            }
-        }
-        stop() {
-            this.isLoading = false;
-            this.emit('complete', this.completed);
-            this.onComplete();
-            this.completed.clear();
-        }
-        updateProgress(file) {
-            this.inflight.delete(file);
-            this.completed.add(file);
-            const totalCompleted = this.completed.size;
-            const totalQueued = this.queue.size + this.inflight.size;
-            if (totalCompleted > 0) {
-                this.progress = totalCompleted / (totalCompleted + totalQueued);
-            }
-            this.emit('progress', this.progress, totalCompleted, totalQueued);
-            this.nextFile();
-        }
-        fileComplete(file) {
-            this.emit('filecomplete', file);
-            this.updateProgress(file);
-        }
-        fileError(file) {
-            this.emit('fileerror', file);
-            this.updateProgress(file);
-        }
-        totalFilesToLoad() {
-            return this.queue.size + this.inflight.size;
-        }
-        setBaseURL(url = '') {
-            if (url !== '' && url.substr(-1) !== '/') {
-                url = url.concat('/');
-            }
-            this.baseURL = url;
-            return this;
-        }
-        setPath(path = '') {
-            if (path !== '' && path.substr(-1) !== '/') {
-                path = path.concat('/');
-            }
-            this.path = path;
-            return this;
-        }
-        setCORS(crossOrigin) {
-            this.crossOrigin = crossOrigin;
-            return this;
-        }
-        setMaxParallelDownloads(max) {
-            this.maxParallelDownloads = max;
-            return this;
+        setText(text) {
+            this._text = text;
+            this.updateText();
         }
     }
 
     class Demo extends Scene {
         constructor(game) {
             super(game);
-            const loader = new Loader(game);
-            loader.setPath('assets');
-            loader.add(ImageFile(game, 'logo', 'logo.png'));
-            loader.add(ImageFile(game, 'hotdog', 'hotdog.png'));
-            loader.add(ImageFile(game, 'uv', 'lemming.png'));
-            loader.start(() => this.create());
-        }
-        create() {
-            this.game.renderer.optimizeRedraw = false;
-            const sprite2 = new Sprite(this, 400, 300, 'uv');
-            const rt = new RenderTexture(this, 'hello', 400, 600);
-            this.game.textures.add(rt.key, rt);
-            rt.batchStart();
-            for (let i = 0; i < 100; i++) {
-                let x = Math.floor(Math.random() * 800);
-                let y = Math.floor(Math.random() * 600);
-                sprite2.setPosition(x, y);
-                // rt.draw(sprite2);
-                rt.batchDraw(sprite2);
-            }
-            rt.batchEnd();
-            const spriteWithRT = new Sprite(this, 400, 300, 'hello');
-            this.world.addChild(spriteWithRT);
+            const bob = new Text(this, 400, 300, 'Hello World');
+            bob.setText('Bubble Bobble');
+            this.world.addChild(bob);
         }
     }
-    function demo41 () {
+    function demo44 () {
         const game = new Game({
             width: 800,
             height: 600,
@@ -2219,19 +2019,18 @@ void main (void)
     }
 
     // import demo1 from './demo1'; // test single sprite
-    // demo36();
-    demo41();
+    demo44();
     //  Next steps:
     //  * Stop a Scene
     //  * Destroy a Game instance
     //  * Camera tint + alpha (as shader uniform)
     //  * Camera background color (instead of renderer bgc)
-    //  * Render Texture (basic frame buffer + draw ability)
     //  * Bitmap Text Game Object
     //  * Tile Layer (using sprite buffer approach + culling?)
     //  * Sprite Sheet from Atlas Frame extractor
     //  * Instead of a Quad class, try a class that can have any number of vertices in it (ala Rope), or any vertex moved
     //  Done:
+    //  X Render Texture (basic frame buffer + draw ability)
     //  X Single Texture shader
     //  X Multi Texture re-use old texture IDs when count > max supported
     //  X Camera moving needs to dirty the renderer
