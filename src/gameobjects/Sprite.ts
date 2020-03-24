@@ -6,6 +6,7 @@ import Install from '../components/Install';
 import ISprite from './ISprite';
 import WebGLRenderer from '../renderer/WebGLRenderer';
 import MultiTextureQuadShader from '../renderer/MultiTextureQuadShader';
+import Texture from '../textures/Texture';
 
 export default class Sprite extends Install(GameObject, [
     Components.ContainerComponent,
@@ -17,7 +18,7 @@ export default class Sprite extends Install(GameObject, [
     vertexData: Float32Array;
     vertexColor: Uint32Array;
 
-    constructor (scene: Scene, x: number, y: number, texture: string, frame?: string | number)
+    constructor (scene: Scene, x: number, y: number, texture: string | Texture, frame?: string | number)
     {
         super();
 
