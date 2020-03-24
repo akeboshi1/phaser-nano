@@ -1,4 +1,6 @@
 import * as Components from '../components';
+import WebGLRenderer from '../renderer/WebGLRenderer';
+import MultiTextureQuadShader from '../renderer/MultiTextureQuadShader';
 
 export default interface ISprite extends
     Components.IContainerComponent,
@@ -23,4 +25,5 @@ export default interface ISprite extends
         vertexColor: Uint32Array;
         packColors (): this;
         updateVertices (F32: Float32Array, U32: Uint32Array, offset: number): void;
+        renderWebGL (renderer: WebGLRenderer, shader: MultiTextureQuadShader, startActiveTexture: number): void;
     }
