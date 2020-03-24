@@ -14,23 +14,34 @@ export default class Texture
     glTexture: WebGLTexture;
     glIndex: number = 0;
     glIndexCounter: number = -1;
+    glFramebuffer: WebGLFramebuffer;
 
     firstFrame: Frame;
 
     frames: Map<string | number, Frame>;
 
-    constructor (key: string, image: TexImageSource)
+    data: any;
+
+    constructor (key: string, image?: TexImageSource, width?: number, height?: number)
     {
+        if (image)
+        {
+            width = image.width;
+            height = image.height;
+        }
+
         this.key = key;
 
         this.image = image;
 
-        this.width = image.width;
-        this.height = image.height;
+        this.width = width;
+        this.height = height;
 
         this.frames = new Map();
 
-        this.add('__BASE', 0, 0, image.width, image.height);
+        this.data = {};
+
+        this.add('__BASE', 0, 0, width, height);
     }
 
     add (key: string | number, x: number, y: number, width: number, height: number): Frame
@@ -106,5 +117,4 @@ export default class Texture
 
         return this.getFrames(frameKeys);
     }
-
 }
