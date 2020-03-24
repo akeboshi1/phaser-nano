@@ -239,13 +239,18 @@ export default class WebGLRenderer
         return glTexture;
     }
 
-    reset ()
+    reset (framebuffer: WebGLFramebuffer = null, width: number = this.width, height: number = this.height)
     {
         const gl = this.gl;
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.viewport(0, 0, this.width, this.height);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.viewport(0, 0, width, height);
 
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        this.currentActiveTexture = 0;
+        this.startActiveTexture++;
     }
 
     render (sceneList: any[], dirtyFrame: number)
@@ -257,7 +262,8 @@ export default class WebGLRenderer
 
         const gl = this.gl;
 
-        //  This is only here because if we don't do _something_ with the context, GL Spector can't see it
+        //  This is only here because if we don't do _something_ with the context, GL Spector can't see it.
+        //  Technically, we could move it below the dirty bail-out below.
         this.reset();
 
         if (this.optimizeRedraw && dirtyFrame === 0)
@@ -265,16 +271,14 @@ export default class WebGLRenderer
             return;
         }
 
-        this.currentActiveTexture = 0;
-        this.startActiveTexture++;
+        // this.currentActiveTexture = 0;
+        // this.startActiveTexture++;
 
         const shader = this.shader;
 
         //  CLS
-        // gl.viewport(0, 0, this.width, this.height);
-
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        // gl.enable(gl.BLEND);
+        // gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
         const cls = this.clearColor;
 
