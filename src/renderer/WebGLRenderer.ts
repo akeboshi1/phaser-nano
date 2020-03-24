@@ -239,6 +239,15 @@ export default class WebGLRenderer
         return glTexture;
     }
 
+    reset ()
+    {
+        const gl = this.gl;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, this.width, this.height);
+
+    }
+
     render (sceneList: any[], dirtyFrame: number)
     {
         if (this.contextLost)
@@ -248,7 +257,8 @@ export default class WebGLRenderer
 
         const gl = this.gl;
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        //  This is only here because if we don't do _something_ with the context, GL Spector can't see it
+        this.reset();
 
         if (this.optimizeRedraw && dirtyFrame === 0)
         {
@@ -261,7 +271,7 @@ export default class WebGLRenderer
         const shader = this.shader;
 
         //  CLS
-        gl.viewport(0, 0, this.width, this.height);
+        // gl.viewport(0, 0, this.width, this.height);
 
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
