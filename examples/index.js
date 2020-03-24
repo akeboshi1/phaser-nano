@@ -143,6 +143,7 @@ void main (void)
             this.bufferByteSize = batchSize * this.quadByteSize;
             this.createBuffers();
             this.createShaders(fragmentShader, vertexShader);
+            this.count = 0;
         }
         createBuffers() {
             let ibo = [];
@@ -169,19 +170,24 @@ void main (void)
             const gl = this.gl;
             const maxTextures = this.renderer.maxTextures;
             let src = '';
-            for (let i = 0; i < maxTextures; i++) {
-                if (i > 0) {
-                    src += '\n    else ';
+            if (maxTextures > 1) {
+                for (let i = 0; i < maxTextures; i++) {
+                    if (i > 0) {
+                        src += '\nelse ';
+                    }
+                    if (i < maxTextures - 1) {
+                        src += `if (vTextureId < ${i}.5)`;
+                    }
+                    src += '\n{';
+                    src += `\n    color = texture2D(uTexture[${i}], vTextureCoord);`;
+                    src += '\n}';
                 }
-                if (i < maxTextures - 1) {
-                    src += `if (vTextureId < ${i}.5)`;
-                }
-                src += '\n    {';
-                src += `\n        color = texture2D(uTexture[${i}], vTextureCoord);`;
-                src += '\n    }';
+                fragmentShaderSource = fragmentShaderSource.replace(/%count%/gi, `${maxTextures}`);
+                fragmentShaderSource = fragmentShaderSource.replace(/%forloop%/gi, src);
             }
-            fragmentShaderSource = fragmentShaderSource.replace(/%count%/gi, `${maxTextures}`);
-            fragmentShaderSource = fragmentShaderSource.replace(/%forloop%/gi, src);
+            else {
+                src = 'color = texture2D(uTexture[0], vTextureCoord);';
+            }
             //  Create the shaders
             const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
             gl.shaderSource(fragmentShader, fragmentShaderSource);
@@ -206,6 +212,7 @@ void main (void)
             gl.enableVertexAttribArray(vertexTextureCoord);
             gl.enableVertexAttribArray(vertexTextureIndex);
             gl.enableVertexAttribArray(vertexColor);
+            //  TODO - Can optimize size by using same variable names
             this.attribs = {
                 position: vertexPosition,
                 textureCoord: vertexTextureCoord,
@@ -218,13 +225,13 @@ void main (void)
                 textureLocation: uTextureLocation
             };
         }
-        bind(camera) {
+        bind(projectionMatrix, cameraMatrix) {
             const gl = this.gl;
             const renderer = this.renderer;
             const uniforms = this.uniforms;
             gl.useProgram(this.program);
-            gl.uniformMatrix4fv(uniforms.projectionMatrix, false, renderer.projectionMatrix);
-            gl.uniformMatrix4fv(uniforms.cameraMatrix, false, camera.matrix);
+            gl.uniformMatrix4fv(uniforms.projectionMatrix, false, projectionMatrix);
+            gl.uniformMatrix4fv(uniforms.cameraMatrix, false, cameraMatrix);
             gl.uniform1iv(uniforms.textureLocation, renderer.textureIndex);
             this.bindBuffers(this.indexBuffer, this.vertexBuffer);
         }
@@ -244,7 +251,7 @@ void main (void)
         flush() {
             const count = this.count;
             if (count === 0) {
-                return;
+                return false;
             }
             const gl = this.gl;
             const offset = count * this.quadByteSize;
@@ -257,6 +264,7 @@ void main (void)
             }
             gl.drawElements(gl.TRIANGLES, count * this.quadIndexSize, gl.UNSIGNED_SHORT, 0);
             this.count = 0;
+            return true;
         }
     }
 
@@ -276,7 +284,8 @@ void main (void)
                 antialias: false,
                 premultipliedAlpha: false,
                 stencil: false,
-                preserveDrawingBuffer: false
+                preserveDrawingBuffer: true,
+                desynchronized: true
             };
             this.clearColor = [0, 0, 0, 1];
             this.maxTextures = 0;
@@ -369,16 +378,32 @@ void main (void)
             }
             return ((width & (width - 1)) === 0) && ((height & (height - 1)) === 0);
         }
-        createGLTexture(source) {
+        createFramebuffer(width, height) {
+            const gl = this.gl;
+            const texture = this.createGLTexture(null, width, height);
+            const framebuffer = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return [texture, framebuffer];
+        }
+        createGLTexture(source, width, height) {
             const gl = this.gl;
             const glTexture = gl.createTexture();
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, glTexture);
             gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+            if (source) {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+                width = source.width;
+                height = source.height;
+            }
+            else {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            }
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            const pot = this.isSizePowerOfTwo(source.width, source.height);
+            const pot = (source && this.isSizePowerOfTwo(width, height));
             const wrap = (pot) ? gl.REPEAT : gl.CLAMP_TO_EDGE;
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
@@ -409,6 +434,7 @@ void main (void)
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
             let prevCamera;
+            const projectionMatrix = this.projectionMatrix;
             for (let c = 0; c < sceneList.length; c += 2) {
                 let camera = sceneList[c];
                 let list = sceneList[c + 1];
@@ -419,7 +445,7 @@ void main (void)
                 //  This only needs rebinding if the camera matrix is different to before
                 if (!prevCamera || !Matrix2dEqual(camera.worldTransform, prevCamera.worldTransform)) {
                     shader.flush();
-                    shader.bind(camera);
+                    shader.bind(projectionMatrix, camera.matrix);
                     prevCamera = camera;
                 }
                 //  Process the render list
@@ -981,15 +1007,20 @@ void main (void)
     }
 
     class Texture {
-        constructor(key, image) {
+        constructor(key, image, width, height) {
             this.glIndex = 0;
             this.glIndexCounter = -1;
+            if (image) {
+                width = image.width;
+                height = image.height;
+            }
             this.key = key;
             this.image = image;
-            this.width = image.width;
-            this.height = image.height;
+            this.width = width;
+            this.height = height;
             this.frames = new Map();
-            this.add('__BASE', 0, 0, image.width, image.height);
+            this.data = {};
+            this.add('__BASE', 0, 0, width, height);
         }
         add(key, x, y, width, height) {
             if (this.frames.has(key)) {
@@ -1667,8 +1698,9 @@ void main (void)
                 else {
                     texture = new Texture(key, source);
                 }
-                // TODO: Make this happen at render time
-                texture.glTexture = this.game.renderer.createGLTexture(texture.image);
+                if (!texture.glTexture) {
+                    texture.glTexture = this.game.renderer.createGLTexture(texture.image);
+                }
                 this.textures.set(key, texture);
             }
             return texture;
@@ -1896,6 +1928,60 @@ void main (void)
         23 = topRight.packedColor
     */
 
+    class RenderTexture extends Texture {
+        constructor(scene, key, width = 256, height = 256) {
+            super(key, null, width, height);
+            this.renderer = scene.game.renderer;
+            const [texture, framebuffer] = this.renderer.createFramebuffer(width, height);
+            this.glTexture = texture;
+            this.glFramebuffer = framebuffer;
+            this.projectionMatrix = this.renderer.ortho(width, height, -10000, 10000);
+            this.cameraMatrix = new Float32Array([1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, height, 0, 1]);
+        }
+        cls(red = 0, green = 0, blue = 0, alpha = 0) {
+            const renderer = this.renderer;
+            const gl = renderer.gl;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.glFramebuffer);
+            // gl.viewport(0, 0, this.width, this.height);
+            gl.clearColor(red, green, blue, alpha);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return this;
+        }
+        batchStart() {
+            const renderer = this.renderer;
+            const gl = renderer.gl;
+            const shader = renderer.shader;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.glFramebuffer);
+            renderer.currentActiveTexture = 0;
+            renderer.startActiveTexture++;
+            shader.bind(this.projectionMatrix, this.cameraMatrix);
+            return this;
+        }
+        batchDraw(...sprites) {
+            const renderer = this.renderer;
+            const shader = renderer.shader;
+            for (let i = 0; i < sprites.length; i++) {
+                sprites[i].renderWebGL(renderer, shader, renderer.startActiveTexture);
+            }
+            return this;
+        }
+        batchEnd() {
+            const renderer = this.renderer;
+            const gl = renderer.gl;
+            const shader = renderer.shader;
+            shader.flush();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return this;
+        }
+        draw(...sprites) {
+            this.batchStart();
+            this.batchDraw(...sprites);
+            this.batchEnd();
+            return this;
+        }
+    }
+
     class File {
         constructor(key, url, config) {
             this.responseType = 'text';
@@ -2098,23 +2184,30 @@ void main (void)
             super(game);
             const loader = new Loader(game);
             loader.setPath('assets');
-            loader.add(ImageFile(game, '32x32'), ImageFile(game, '128x128'), ImageFile(game, '512x512'), ImageFile(game, 'ayu'), ImageFile(game, 'balls'), ImageFile(game, 'beball1'), ImageFile(game, 'box-item-boxed'), ImageFile(game, 'brain'), ImageFile(game, 'bubble256'), ImageFile(game, 'car'), ImageFile(game, 'carrot'), ImageFile(game, 'checker'), ImageFile(game, 'clown'), ImageFile(game, 'hotdog'), ImageFile(game, 'lance-overdose-loader-eye'), ImageFile(game, 'lemming'), ImageFile(game, 'logo'), ImageFile(game, 'mushroom-32x32'), ImageFile(game, 'muzzleflash2'), ImageFile(game, 'orange-cat1'), ImageFile(game, 'orb-blue'), ImageFile(game, 'orb-red'), ImageFile(game, 'pacman_by_oz_28x28'), ImageFile(game, 'phaser-ship'), ImageFile(game, 'phaser_tiny'), ImageFile(game, 'red'), ImageFile(game, 'rocket'), ImageFile(game, 'shinyball'), ImageFile(game, 'skull'), ImageFile(game, 'sonic'), ImageFile(game, 'star'));
-            loader.on('progress', (progress, totalCompleted, totalQueued) => {
-                console.log(progress, ' - (' + totalCompleted + ' / ' + totalQueued + ')');
-            });
+            loader.add(ImageFile(game, 'logo', 'logo.png'));
+            loader.add(ImageFile(game, 'hotdog', 'hotdog.png'));
+            loader.add(ImageFile(game, 'uv', 'lemming.png'));
             loader.start(() => this.create());
         }
         create() {
             this.game.renderer.optimizeRedraw = false;
-            this.game.textures.textures.forEach((texture, key) => {
-                let x = 50 + Math.floor(Math.random() * 700);
-                let y = 50 + Math.floor(Math.random() * 500);
-                let s = new Sprite(this, x, y, key);
-                this.world.addChild(s);
-            });
+            const sprite2 = new Sprite(this, 400, 300, 'uv');
+            const rt = new RenderTexture(this, 'hello', 400, 600);
+            this.game.textures.add(rt.key, rt);
+            rt.batchStart();
+            for (let i = 0; i < 100; i++) {
+                let x = Math.floor(Math.random() * 800);
+                let y = Math.floor(Math.random() * 600);
+                sprite2.setPosition(x, y);
+                // rt.draw(sprite2);
+                rt.batchDraw(sprite2);
+            }
+            rt.batchEnd();
+            const spriteWithRT = new Sprite(this, 400, 300, 'hello');
+            this.world.addChild(spriteWithRT);
         }
     }
-    function demo38 () {
+    function demo41 () {
         const game = new Game({
             width: 800,
             height: 600,
@@ -2126,15 +2219,20 @@ void main (void)
     }
 
     // import demo1 from './demo1'; // test single sprite
-    demo38();
+    // demo36();
+    demo41();
     //  Next steps:
+    //  * Stop a Scene
+    //  * Destroy a Game instance
     //  * Camera tint + alpha (as shader uniform)
     //  * Camera background color (instead of renderer bgc)
-    //  * Single Texture shader
-    //  * Tile Layer
+    //  * Render Texture (basic frame buffer + draw ability)
+    //  * Bitmap Text Game Object
+    //  * Tile Layer (using sprite buffer approach + culling?)
     //  * Sprite Sheet from Atlas Frame extractor
     //  * Instead of a Quad class, try a class that can have any number of vertices in it (ala Rope), or any vertex moved
     //  Done:
+    //  X Single Texture shader
     //  X Multi Texture re-use old texture IDs when count > max supported
     //  X Camera moving needs to dirty the renderer
     //  X Load json / csv / xml on their own

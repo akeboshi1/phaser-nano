@@ -35,21 +35,29 @@
 // import demo35 from './demo35'; // Mouse Input - Hit Test
 // import demo36 from './demo36'; // Mouse Input - Hit Test Children
 // import demo37 from './demo37'; // Sprite Buffer
-import demo38 from './demo38'; // Texture > max Texture switch
+// import demo38 from './demo38'; // Texture > max Texture switch
+// import demo39 from './demo39'; // Bitmap Text File loader
+// import demo40 from './demo40'; // Bitmap Text File Game Object
+import demo41 from './demo41'; // Render Texture
 
-demo38();
+// demo36();
+demo41();
 
 //  Next steps:
 
+//  * Stop a Scene
+//  * Destroy a Game instance
 //  * Camera tint + alpha (as shader uniform)
 //  * Camera background color (instead of renderer bgc)
-//  * Single Texture shader
-//  * Tile Layer
+//  * Render Texture (basic frame buffer + draw ability)
+//  * Bitmap Text Game Object
+//  * Tile Layer (using sprite buffer approach + culling?)
 //  * Sprite Sheet from Atlas Frame extractor
 //  * Instead of a Quad class, try a class that can have any number of vertices in it (ala Rope), or any vertex moved
 
 //  Done:
 
+//  X Single Texture shader
 //  X Multi Texture re-use old texture IDs when count > max supported
 //  X Camera moving needs to dirty the renderer
 //  X Load json / csv / xml on their own
