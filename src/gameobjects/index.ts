@@ -4,6 +4,7 @@ import Container from './Container';
 import GameObject from './GameObject';
 import Sprite from './Sprite';
 import SpriteBuffer from './SpriteBuffer';
+import Text from './Text';
 import World from './World';
 
 export default {
@@ -13,5 +14,6 @@ export default {
     GameObject,
     Sprite,
     SpriteBuffer,
+    Text,
     World
 }
