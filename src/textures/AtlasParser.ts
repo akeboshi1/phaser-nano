@@ -1,7 +1,7 @@
 import Texture from './Texture';
 import Frame from './Frame';
 
-export default function (texture: Texture, data: any)
+export default function AtlasParser (texture: Texture, data: any)
 {
     let frames;
 
