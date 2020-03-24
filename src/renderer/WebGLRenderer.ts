@@ -5,6 +5,8 @@ import Camera from '../gameobjects/Camera';
 import IRenderable from '../gameobjects/IRenderable';
 import Matrix2dEqual from '../math/Matrix2dEqual';
 import ICamera from '../gameobjects/ICamera';
+import Ortho from './Ortho';
+import GL from './GL';
 
 export default class WebGLRenderer
 {
@@ -33,8 +35,8 @@ export default class WebGLRenderer
     
     maxTextures: number = 0;
     activeTextures: Texture[];
-    currentActiveTexture: number;
-    startActiveTexture: number;
+    currentActiveTexture: number = 0;
+    startActiveTexture: number = 0;
 
     clearBeforeRender: boolean = true;
     optimizeRedraw: boolean = true;
@@ -65,20 +67,21 @@ export default class WebGLRenderer
     {
         const gl = this.canvas.getContext('webgl', this.contextOptions);
 
+        GL.set(gl);
+
         this.gl = gl;
 
         this.elementIndexExtension = gl.getExtension('OES_element_index_uint');
 
         this.getMaxTextures();
 
-        // https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/depthFunc
-        // gl.enable(gl.DEPTH_TEST);
-        // gl.depthFunc(gl.LESS);
-
         if (this.shader)
         {
             this.shader.gl = gl;
         }
+
+        gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.CULL_FACE);
 
         this.resize(this.width, this.height, this.resolution);
     }
@@ -102,16 +105,7 @@ export default class WebGLRenderer
     
         this.gl.viewport(0, 0, this.width, this.height);
 
-        this.projectionMatrix = this.ortho(width, height, -10000, 10000);
-    }
-
-    ortho (width: number, height: number, near: number, far: number): Float32Array
-    {
-        const m00: number = -2 * (1 / -width);
-        const m11: number = -2 * (1 / height);
-        const m22: number = 2 * (1 / (near - far));
-
-        return new Float32Array([ m00, 0, 0, 0, 0, m11, 0, 0, 0, 0, m22, 0, -1, 1, 0, 1 ]);
+        this.projectionMatrix = Ortho(width, height);
     }
 
     onContextLost (event)
@@ -169,74 +163,6 @@ export default class WebGLRenderer
         this.activeTextures = Array(maxTextures);
 
         this.currentActiveTexture = 0;
-        this.startActiveTexture = 0;
-    }
-
-    isSizePowerOfTwo (width: number, height: number): boolean
-    {
-        if (width < 1 || height < 1)
-        {
-            return false;
-        }
-
-        return ((width & (width - 1)) === 0) && ((height & (height - 1)) === 0);
-    }
-
-    createFramebuffer (width: number, height: number): [ WebGLTexture, WebGLFramebuffer ]
-    {
-        const gl = this.gl;
-
-        const texture = this.createGLTexture(null, width, height);
-        const framebuffer = gl.createFramebuffer();
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-        return [ texture, framebuffer ];
-    }
-
-    createGLTexture (source?: TexImageSource, width?: number, height?: number): WebGLTexture
-    {
-        const gl = this.gl;
-
-        const glTexture: WebGLTexture = gl.createTexture();
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, glTexture);
-
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-
-        if (source)
-        {
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
-
-            width = source.width;
-            height = source.height;
-        }
-        else
-        {
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        }
-
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-        const pot = (source && this.isSizePowerOfTwo(width, height));
-
-        const wrap = (pot) ? gl.REPEAT : gl.CLAMP_TO_EDGE;
-
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
-
-        if (pot)
-        {
-            gl.generateMipmap(gl.TEXTURE_2D);
-        }
-
-        return glTexture;
     }
 
     reset (framebuffer: WebGLFramebuffer = null, width: number = this.width, height: number = this.height)
@@ -271,15 +197,7 @@ export default class WebGLRenderer
             return;
         }
 
-        // this.currentActiveTexture = 0;
-        // this.startActiveTexture++;
-
         const shader = this.shader;
-
-        //  CLS
-        // gl.enable(gl.BLEND);
-        // gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-
         const cls = this.clearColor;
 
         if (this.clearBeforeRender)
