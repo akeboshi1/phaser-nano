@@ -16,7 +16,8 @@ export default class WebGLRenderer
         antialias: false,
         premultipliedAlpha: false,
         stencil: false,
-        preserveDrawingBuffer: false
+        preserveDrawingBuffer: true,
+        desynchronized: true
     };
 
     clearColor = [ 0, 0, 0, 1 ];
@@ -181,7 +182,23 @@ export default class WebGLRenderer
         return ((width & (width - 1)) === 0) && ((height & (height - 1)) === 0);
     }
 
-    createGLTexture (source: TexImageSource): WebGLTexture
+    createFramebuffer (width: number, height: number): [ WebGLTexture, WebGLFramebuffer ]
+    {
+        const gl = this.gl;
+
+        const texture = this.createGLTexture(null, width, height);
+        const framebuffer = gl.createFramebuffer();
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        return [ texture, framebuffer ];
+    }
+
+    createGLTexture (source?: TexImageSource, width?: number, height?: number): WebGLTexture
     {
         const gl = this.gl;
 
@@ -192,12 +209,22 @@ export default class WebGLRenderer
 
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+        if (source)
+        {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+
+            width = source.width;
+            height = source.height;
+        }
+        else
+        {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        }
 
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-        const pot = this.isSizePowerOfTwo(source.width, source.height);
+        const pot = (source && this.isSizePowerOfTwo(width, height));
 
         const wrap = (pot) ? gl.REPEAT : gl.CLAMP_TO_EDGE;
 
@@ -249,6 +276,8 @@ export default class WebGLRenderer
 
         let prevCamera: Camera;
 
+        const projectionMatrix = this.projectionMatrix;
+
         for (let c: number = 0; c < sceneList.length; c += 2)
         {
             let camera: ICamera = sceneList[c];
@@ -266,7 +295,7 @@ export default class WebGLRenderer
             {
                 shader.flush();
 
-                shader.bind(camera);
+                shader.bind(projectionMatrix, camera.matrix);
 
                 prevCamera = camera;
             }
