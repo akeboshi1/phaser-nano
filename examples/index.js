@@ -1976,6 +1976,9 @@ void main (void)
     class Text extends Sprite {
         constructor(scene, x, y, text) {
             super(scene, x, y, SolidColorTexture());
+            this.splitRegExp = /(?:\r\n|\r|\n)/;
+            this.padding = { left: 0, right: 0, top: 0, bottom: 0 };
+            this.lineSpacing = 0;
             this._text = text;
             this._canvas = this.texture.image;
             this._ctx = this._canvas.getContext('2d');
@@ -1985,7 +1988,11 @@ void main (void)
         updateText() {
             const canvas = this._canvas;
             const ctx = this._ctx;
-            ctx.font = 'Courier';
+            let text = this._text;
+            let lines = text.split(this.splitRegExp);
+            //  GetTextSize()
+            const padding = this.padding;
+            ctx.font = '16px monospace';
             ctx.textBaseline = 'alphabetic';
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, 256, 256);
@@ -1993,9 +2000,17 @@ void main (void)
             ctx.fillText(this._text, 0, 10);
             UpdateGLTexture(GL.get(), canvas, this.texture.glTexture);
         }
-        setText(text) {
-            this._text = text;
-            this.updateText();
+        setText(value) {
+            if (!value) {
+                value = '';
+            }
+            if (Array.isArray(value)) {
+                value = value.join('\n');
+            }
+            if (value !== this._text) {
+                this._text = value.toString();
+                this.updateText();
+            }
         }
     }
 

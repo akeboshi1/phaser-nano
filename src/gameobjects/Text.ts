@@ -11,6 +11,10 @@ export default class Text extends Sprite
     private _text: string;
     private _canvas: HTMLCanvasElement;
     private _ctx: CanvasRenderingContext2D;
+    
+    splitRegExp: RegExp = /(?:\r\n|\r|\n)/;
+    padding = { left: 0, right: 0, top: 0, bottom: 0 };
+    lineSpacing: number = 0;
 
     constructor (scene: Scene, x: number, y: number, text: string)
     {
@@ -30,7 +34,14 @@ export default class Text extends Sprite
         const canvas = this._canvas;
         const ctx = this._ctx;
 
-        ctx.font = 'Courier';
+        let text = this._text;
+        let lines = text.split(this.splitRegExp);
+
+        //  GetTextSize()
+
+        const padding = this.padding;
+
+        ctx.font = '16px monospace';
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, 256, 256);
@@ -40,11 +51,24 @@ export default class Text extends Sprite
         UpdateGLTexture(GL.get(), canvas, this.texture.glTexture);
     }
 
-    setText (text: string)
+    setText (value: string | string[])
     {
-        this._text = text;
+        if (!value)
+        {
+            value = '';
+        }
 
-        this.updateText();
+        if (Array.isArray(value))
+        {
+            value = value.join('\n');
+        }
+
+        if (value !== this._text)
+        {
+            this._text = value.toString();
+
+            this.updateText();
+        }
     }
 }
 
