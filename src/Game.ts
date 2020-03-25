@@ -34,12 +34,13 @@ export default class Game extends EventEmitter
         const {
             width = 800,
             height = 600,
+            resolution = 1,
             backgroundColor = 0x00000,
             parent = document.body,
             scene = null
         } = config;
 
-        this.config = { width, height, backgroundColor, parent, scene };
+        this.config = { width, height, resolution, backgroundColor, parent, scene };
 
         this.cache = {
             json: new Map(),
@@ -73,7 +74,7 @@ export default class Game extends EventEmitter
         this.isBooted = true;
         this.lastTick = Date.now();
 
-        const renderer = new WebGLRenderer(config.width, config.height);
+        const renderer = new WebGLRenderer(config.width, config.height, config.resolution);
 
         renderer.setBackgroundColor(config.backgroundColor);
 
