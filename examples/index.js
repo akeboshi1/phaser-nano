@@ -201,28 +201,24 @@ void main (void)
             gl.linkProgram(program);
             gl.useProgram(program);
             this.program = program;
-            const vertexPosition = gl.getAttribLocation(program, 'aVertexPosition');
-            const vertexTextureCoord = gl.getAttribLocation(program, 'aTextureCoord');
-            const vertexTextureIndex = gl.getAttribLocation(program, 'aTextureId');
-            const vertexColor = gl.getAttribLocation(program, 'aTintColor');
-            const uProjectionMatrix = gl.getUniformLocation(program, 'uProjectionMatrix');
-            const uCameraMatrix = gl.getUniformLocation(program, 'uCameraMatrix');
-            const uTextureLocation = gl.getUniformLocation(program, 'uTexture');
-            gl.enableVertexAttribArray(vertexPosition);
-            gl.enableVertexAttribArray(vertexTextureCoord);
-            gl.enableVertexAttribArray(vertexTextureIndex);
-            gl.enableVertexAttribArray(vertexColor);
-            //  TODO - Can optimize size by using same variable names
+            const position = gl.getAttribLocation(program, 'aVertexPosition');
+            const textureCoord = gl.getAttribLocation(program, 'aTextureCoord');
+            const textureIndex = gl.getAttribLocation(program, 'aTextureId');
+            const color = gl.getAttribLocation(program, 'aTintColor');
+            gl.enableVertexAttribArray(position);
+            gl.enableVertexAttribArray(textureCoord);
+            gl.enableVertexAttribArray(textureIndex);
+            gl.enableVertexAttribArray(color);
             this.attribs = {
-                position: vertexPosition,
-                textureCoord: vertexTextureCoord,
-                textureIndex: vertexTextureIndex,
-                color: vertexColor
+                position,
+                textureCoord,
+                textureIndex,
+                color
             };
             this.uniforms = {
-                projectionMatrix: uProjectionMatrix,
-                cameraMatrix: uCameraMatrix,
-                textureLocation: uTextureLocation
+                projectionMatrix: gl.getUniformLocation(program, 'uProjectionMatrix'),
+                cameraMatrix: gl.getUniformLocation(program, 'uCameraMatrix'),
+                textureLocation: gl.getUniformLocation(program, 'uTexture')
             };
         }
         bind(projectionMatrix, cameraMatrix) {
@@ -297,7 +293,7 @@ void main (void)
     };
 
     class WebGLRenderer {
-        constructor(width, height, resolution = 1) {
+        constructor(width, height, resolution) {
             this.contextOptions = {
                 alpha: false,
                 antialias: false,
@@ -961,6 +957,13 @@ void main (void)
         setPivot(x, y) {
             this.pivot = { x, y };
         }
+        setSize(width, height) {
+            this.width = width;
+            this.height = height;
+            this.sourceSizeWidth = width;
+            this.sourceSizeHeight = height;
+            this.updateUVs();
+        }
         setSourceSize(width, height) {
             this.sourceSizeWidth = width;
             this.sourceSizeHeight = height;
@@ -1042,6 +1045,12 @@ void main (void)
                 frameKeys.push(prefix + i.toString().padStart(zeroPad, '0') + suffix);
             }
             return this.getFrames(frameKeys);
+        }
+        setSize(width, height) {
+            this.width = width;
+            this.height = height;
+            const frame = this.frames.get('__BASE');
+            frame.setSize(width, height);
         }
     }
 
@@ -1664,7 +1673,7 @@ void main (void)
         return ((width & (width - 1)) === 0) && ((height & (height - 1)) === 0);
     }
 
-    function CreateGLTexture(gl, source, width, height) {
+    function CreateGLTexture(gl, source, width, height, potClamp = true) {
         const glTexture = gl.createTexture();
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, glTexture);
@@ -1680,7 +1689,7 @@ void main (void)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         const pot = (source && IsPowerOfTwo(width, height));
-        const wrap = (pot) ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+        const wrap = (pot && potClamp) ? gl.REPEAT : gl.CLAMP_TO_EDGE;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
         if (pot) {
@@ -1744,8 +1753,8 @@ void main (void)
             this.elapsed = 0;
             //  The current game frame
             this.frame = 0;
-            const { width = 800, height = 600, backgroundColor = 0x00000, parent = document.body, scene = null } = config;
-            this.config = { width, height, backgroundColor, parent, scene };
+            const { width = 800, height = 600, resolution = 1, backgroundColor = 0x00000, parent = document.body, scene = null } = config;
+            this.config = { width, height, resolution, backgroundColor, parent, scene };
             this.cache = {
                 json: new Map(),
                 csv: new Map(),
@@ -1766,7 +1775,7 @@ void main (void)
             const config = this.config;
             this.isBooted = true;
             this.lastTick = Date.now();
-            const renderer = new WebGLRenderer(config.width, config.height);
+            const renderer = new WebGLRenderer(config.width, config.height, config.resolution);
             renderer.setBackgroundColor(config.backgroundColor);
             AddToDOM(renderer.canvas, config.parent);
             this.renderer = renderer;
@@ -1979,25 +1988,40 @@ void main (void)
             this.splitRegExp = /(?:\r\n|\r|\n)/;
             this.padding = { left: 0, right: 0, top: 0, bottom: 0 };
             this.lineSpacing = 0;
+            this.font = '32px monospace';
+            this.fillStyle = '#fff';
             this._text = text;
             this._canvas = this.texture.image;
             this._ctx = this._canvas.getContext('2d');
-            this.texture.glTexture = CreateGLTexture(GL.get(), this._canvas);
+            this.texture.glTexture = CreateGLTexture(GL.get(), this._canvas, 32, 32, false);
+            this.resolution = window.devicePixelRatio || 1;
             this.updateText();
         }
         updateText() {
             const canvas = this._canvas;
             const ctx = this._ctx;
+            const resolution = this.resolution;
             let text = this._text;
-            let lines = text.split(this.splitRegExp);
-            //  GetTextSize()
-            const padding = this.padding;
-            ctx.font = '16px monospace';
-            ctx.textBaseline = 'alphabetic';
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, 256, 256);
-            ctx.fillStyle = '#ff0000';
-            ctx.fillText(this._text, 0, 10);
+            // let lines = text.split(this.splitRegExp);
+            // const padding = this.padding;
+            ctx.font = this.font;
+            // ctx.textBaseline = 'alphabetic';
+            const metrics = ctx.measureText(text);
+            let width = Math.ceil(metrics.width);
+            let height = Math.ceil(metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent);
+            width = Math.max(width * resolution, 1);
+            height = Math.max(height * resolution, 1);
+            if (canvas.width !== width || canvas.height !== height) {
+                canvas.width = width;
+                canvas.height = height;
+                this.texture.setSize(width / resolution, height / resolution);
+            }
+            ctx.save();
+            ctx.scale(resolution, resolution);
+            ctx.font = this.font;
+            ctx.fillStyle = this.fillStyle;
+            ctx.fillText(this._text, 0, metrics.actualBoundingBoxAscent);
+            ctx.restore();
             UpdateGLTexture(GL.get(), canvas, this.texture.glTexture);
         }
         setText(value) {
@@ -2014,27 +2038,332 @@ void main (void)
         }
     }
 
+    class Loader extends EventEmitter {
+        constructor(game) {
+            super();
+            this.baseURL = '';
+            this.path = '';
+            this.crossOrigin = 'anonymous';
+            //  -1 means load everything at once
+            this.maxParallelDownloads = -1;
+            this.isLoading = false;
+            this.game = game;
+            this.reset();
+        }
+        reset() {
+            this.isLoading = false;
+            this.queue = new Set();
+            this.inflight = new Set();
+            this.completed = new Set();
+            this.progress = 0;
+        }
+        add(...file) {
+            file.forEach(entity => {
+                entity.loader = this;
+                this.queue.add(entity);
+            });
+            return this;
+        }
+        start(onComplete) {
+            if (this.isLoading) {
+                return;
+            }
+            this.completed.clear();
+            this.progress = 0;
+            if (this.queue.size > 0) {
+                this.isLoading = true;
+                this.onComplete = onComplete;
+                this.emit('start');
+                this.nextFile();
+            }
+            else {
+                this.progress = 1;
+                this.emit('complete');
+                onComplete();
+            }
+            return this;
+        }
+        nextFile() {
+            let limit = this.queue.size;
+            if (this.maxParallelDownloads !== -1) {
+                limit = Math.min(limit, this.maxParallelDownloads) - this.inflight.size;
+            }
+            if (limit) {
+                // console.log('Batching', limit, 'files to download');
+                const iterator = this.queue.values();
+                while (limit > 0) {
+                    const file = iterator.next().value;
+                    // console.log('Loader.nextFile', file.key, '=>', file.url);
+                    this.inflight.add(file);
+                    this.queue.delete(file);
+                    file.load().then((file) => this.fileComplete(file)).catch((file) => this.fileError(file));
+                    limit--;
+                }
+            }
+            else if (this.inflight.size === 0) {
+                this.stop();
+            }
+        }
+        stop() {
+            this.isLoading = false;
+            this.emit('complete', this.completed);
+            this.onComplete();
+            this.completed.clear();
+        }
+        updateProgress(file) {
+            this.inflight.delete(file);
+            this.completed.add(file);
+            const totalCompleted = this.completed.size;
+            const totalQueued = this.queue.size + this.inflight.size;
+            if (totalCompleted > 0) {
+                this.progress = totalCompleted / (totalCompleted + totalQueued);
+            }
+            this.emit('progress', this.progress, totalCompleted, totalQueued);
+            this.nextFile();
+        }
+        fileComplete(file) {
+            this.emit('filecomplete', file);
+            this.updateProgress(file);
+        }
+        fileError(file) {
+            this.emit('fileerror', file);
+            this.updateProgress(file);
+        }
+        totalFilesToLoad() {
+            return this.queue.size + this.inflight.size;
+        }
+        setBaseURL(url = '') {
+            if (url !== '' && url.substr(-1) !== '/') {
+                url = url.concat('/');
+            }
+            this.baseURL = url;
+            return this;
+        }
+        setPath(path = '') {
+            if (path !== '' && path.substr(-1) !== '/') {
+                path = path.concat('/');
+            }
+            this.path = path;
+            return this;
+        }
+        setCORS(crossOrigin) {
+            this.crossOrigin = crossOrigin;
+            return this;
+        }
+        setMaxParallelDownloads(max) {
+            this.maxParallelDownloads = max;
+            return this;
+        }
+    }
+
+    class File {
+        constructor(key, url, config) {
+            this.responseType = 'text';
+            this.crossOrigin = undefined;
+            this.skipCache = false;
+            this.hasLoaded = false;
+            this.key = key;
+            this.url = url;
+            this.config = config;
+        }
+    }
+
+    function XHRLoader(file) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', file.url, true);
+        xhr.responseType = file.responseType;
+        return new Promise((resolve, reject) => {
+            xhr.onload = () => {
+                file.data = xhr.responseText;
+                file.hasLoaded = true;
+                resolve(file);
+            };
+            xhr.onerror = () => {
+                file.hasLoaded = true;
+                reject(file);
+            };
+            xhr.send();
+        });
+    }
+
+    function GetURL(key, url, extension, loader) {
+        if (!url) {
+            url = key + extension;
+        }
+        if (url.match(/^(?:blob:|data:|http:\/\/|https:\/\/|\/\/)/)) {
+            return url;
+        }
+        else {
+            if (loader) {
+                return loader.baseURL + loader.path + url;
+            }
+            else {
+                return url;
+            }
+        }
+    }
+
+    function JSONFile(game, key, url) {
+        const file = new File(key, url);
+        file.load = () => {
+            file.url = GetURL(file.key, file.url, '.json', file.loader);
+            return new Promise((resolve, reject) => {
+                XHRLoader(file).then(file => {
+                    file.data = JSON.parse(file.data);
+                    if (!file.skipCache) {
+                        game.cache.json.set(file.key, file.data);
+                    }
+                    resolve(file);
+                }).catch(file => {
+                    reject(file);
+                });
+            });
+        };
+        return file;
+    }
+
+    function ImageTagLoader(file) {
+        file.data = new Image();
+        if (file.crossOrigin) {
+            file.data.crossOrigin = file.crossOrigin;
+        }
+        return new Promise((resolve, reject) => {
+            file.data.onload = () => {
+                if (file.data.onload) {
+                    file.data.onload = null;
+                    file.data.onerror = null;
+                    resolve(file);
+                }
+            };
+            file.data.onerror = (event) => {
+                if (file.data.onload) {
+                    file.data.onload = null;
+                    file.data.onerror = null;
+                    file.error = event;
+                    reject(file);
+                }
+            };
+            file.data.src = file.url;
+            // Image is immediately-available or cached
+            if (file.data.complete && file.data.width && file.data.height) {
+                file.data.onload = null;
+                file.data.onerror = null;
+                resolve(file);
+            }
+        });
+    }
+
+    function ImageFile(game, key, url) {
+        const file = new File(key, url);
+        file.load = () => {
+            file.url = GetURL(file.key, file.url, '.png', file.loader);
+            if (file.loader) {
+                file.crossOrigin = file.loader.crossOrigin;
+            }
+            return new Promise((resolve, reject) => {
+                ImageTagLoader(file).then(file => {
+                    game.textures.add(key, file.data);
+                    resolve(file);
+                }).catch(file => {
+                    reject(file);
+                });
+            });
+        };
+        return file;
+    }
+
+    function AtlasParser(texture, data) {
+        let frames;
+        if (Array.isArray(data.textures)) {
+            //  TP3 Format
+            frames = data.textures[0].frames;
+        }
+        else if (Array.isArray(data.frames)) {
+            //  TP2 Format Array
+            frames = data.frames;
+        }
+        else if (data.hasOwnProperty('frames')) {
+            //  TP2 Format Hash
+            frames = Object.values(data.frames);
+        }
+        else {
+            console.warn('Invalid Texture Atlas JSON');
+        }
+        if (frames) {
+            let newFrame;
+            for (let i = 0; i < frames.length; i++) {
+                let src = frames[i];
+                //  The frame values are the exact coordinates to cut the frame out of the atlas from
+                newFrame = texture.add(src.filename, src.frame.x, src.frame.y, src.frame.w, src.frame.h);
+                //  These are the original (non-trimmed) sprite values
+                if (src.trimmed) {
+                    newFrame.setTrim(src.sourceSize.w, src.sourceSize.h, src.spriteSourceSize.x, src.spriteSourceSize.y, src.spriteSourceSize.w, src.spriteSourceSize.h);
+                }
+                else {
+                    newFrame.setSourceSize(src.sourceSize.w, src.sourceSize.h);
+                }
+                if (src.rotated) ;
+                if (src.anchor) {
+                    newFrame.setPivot(src.anchor.x, src.anchor.y);
+                }
+            }
+        }
+    }
+
+    function AtlasFile(game, key, textureURL, atlasURL) {
+        const json = JSONFile(game, key, atlasURL);
+        const image = ImageFile(game, key, textureURL);
+        const file = new File(key, '');
+        file.load = () => {
+            //  If called via a Loader, it has been set into the file const
+            json.url = GetURL(json.key, json.url, '.json', file.loader);
+            image.url = GetURL(image.key, image.url, '.png', file.loader);
+            return new Promise((resolve, reject) => {
+                json.skipCache = true;
+                json.load().then(() => {
+                    image.load().then(() => {
+                        //  By this stage, the JSON and image are loaded and in the texture manager
+                        AtlasParser(game.textures.get(key), json.data);
+                        resolve(file);
+                    }).catch(() => {
+                        reject(file);
+                    });
+                }).catch(() => {
+                    reject(file);
+                });
+            });
+        };
+        return file;
+    }
+
     class Demo extends Scene {
         constructor(game) {
             super(game);
-            const bob = new Text(this, 400, 300, 'Hello World');
-            bob.setText('Bubble Bobble');
-            this.world.addChild(bob);
+            const loader = new Loader(game);
+            loader.setPath('assets');
+            loader.add(AtlasFile(game, 'atlas', 'atlas-trimmed.png', 'atlas-trimmed.json'));
+            loader.start(() => this.create());
+        }
+        create() {
+            const pic = new Sprite(this, 400, 200, 'atlas', 'hotdog');
+            const text = new Text(this, 400, 300, 'Welcome to Phaser Nano');
+            text.setTint(0xff0000, 0xff0000, 0xffff00, 0xffff00);
+            this.world.addChild(pic, text);
         }
     }
-    function demo44 () {
-        const game = new Game({
+    function demo45 () {
+        new Game({
             width: 800,
             height: 600,
+            resolution: window.devicePixelRatio,
             backgroundColor: 0x000033,
             parent: 'gameParent',
             scene: Demo
         });
-        window['game'] = game;
     }
 
     // import demo1 from './demo1'; // test single sprite
-    demo44();
+    demo45();
     //  Next steps:
     //  * Stop a Scene
     //  * Destroy a Game instance

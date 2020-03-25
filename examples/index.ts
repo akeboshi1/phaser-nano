@@ -41,9 +41,10 @@
 // import demo41 from './demo41'; // Render Texture
 // import demo42 from './demo42'; // Render Texture draw
 // import demo43 from './demo43'; // Render Texture draw with atlas frame
-import demo44 from './demo44'; // Text Game Object
+// import demo44 from './demo44'; // Text Game Object
+import demo45 from './demo45'; // Retina DPI
 
-demo44();
+demo45();
 
 //  Next steps:
 
