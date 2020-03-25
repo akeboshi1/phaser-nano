@@ -116,4 +116,14 @@ export default class Texture
 
         return this.getFrames(frameKeys);
     }
+
+    setSize (width: number, height: number)
+    {
+        this.width = width;
+        this.height = height;
+
+        const frame = this.frames.get('__BASE');
+
+        frame.setSize(width, height);
+    }
 }

@@ -52,6 +52,16 @@ export default class Frame
         this.pivot = { x, y };
     }
 
+    setSize (width: number, height: number)
+    {
+        this.width = width;
+        this.height = height;
+        this.sourceSizeWidth = width;
+        this.sourceSizeHeight = height;
+
+        this.updateUVs();
+    }
+
     setSourceSize (width: number, height: number)
     {
         this.sourceSizeWidth = width;
