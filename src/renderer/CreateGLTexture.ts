@@ -1,6 +1,6 @@
 import IsPowerOfTwo from '../math/IsPowerOfTwo';
 
-export default function CreateGLTexture (gl: WebGLRenderingContext, source?: TexImageSource, width?: number, height?: number): WebGLTexture
+export default function CreateGLTexture (gl: WebGLRenderingContext, source?: TexImageSource, width?: number, height?: number, potClamp: boolean = true): WebGLTexture
 {
     const glTexture: WebGLTexture = gl.createTexture();
 
@@ -26,7 +26,7 @@ export default function CreateGLTexture (gl: WebGLRenderingContext, source?: Tex
 
     const pot = (source && IsPowerOfTwo(width, height));
 
-    const wrap = (pot) ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+    const wrap = (pot && potClamp) ? gl.REPEAT : gl.CLAMP_TO_EDGE;
 
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
