@@ -45,7 +45,7 @@ export default class WebGLRenderer
     contextLost: boolean = false;
     elementIndexExtension: OES_element_index_uint;
 
-    constructor (width: number, height: number, resolution: number = 1)
+    constructor (width: number, height: number, resolution: number)
     {
         this.width = width;
         this.height = height;
