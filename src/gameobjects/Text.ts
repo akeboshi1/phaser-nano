@@ -15,6 +15,9 @@ export default class Text extends Sprite
     splitRegExp: RegExp = /(?:\r\n|\r|\n)/;
     padding = { left: 0, right: 0, top: 0, bottom: 0 };
     lineSpacing: number = 0;
+    resolution: number;
+    font: string = '32px monospace';
+    fillStyle: string = '#fff';
 
     constructor (scene: Scene, x: number, y: number, text: string)
     {
@@ -24,7 +27,9 @@ export default class Text extends Sprite
         this._canvas = this.texture.image as HTMLCanvasElement;
         this._ctx = this._canvas.getContext('2d');
 
-        this.texture.glTexture = CreateGLTexture(GL.get(), this._canvas);
+        this.texture.glTexture = CreateGLTexture(GL.get(), this._canvas, 32, 32, false);
+
+        this.resolution = window.devicePixelRatio || 1;
 
         this.updateText();
     }
@@ -33,20 +38,38 @@ export default class Text extends Sprite
     {
         const canvas = this._canvas;
         const ctx = this._ctx;
+        const resolution = this.resolution;
 
         let text = this._text;
-        let lines = text.split(this.splitRegExp);
 
-        //  GetTextSize()
+        // let lines = text.split(this.splitRegExp);
+        // const padding = this.padding;
 
-        const padding = this.padding;
+        ctx.font = this.font;
+        // ctx.textBaseline = 'alphabetic';
 
-        ctx.font = '16px monospace';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, 256, 256);
-        ctx.fillStyle = '#ff0000';
-        ctx.fillText(this._text, 0, 10);
+        const metrics = ctx.measureText(text);
+
+        let width = Math.ceil(metrics.width);
+        let height = Math.ceil(metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent);
+
+        width = Math.max(width * resolution, 1);
+        height = Math.max(height * resolution, 1);
+
+        if (canvas.width !== width || canvas.height !== height)
+        {
+            canvas.width = width;
+            canvas.height = height;
+    
+            this.texture.setSize(width / resolution, height / resolution);
+        }
+
+        ctx.save();
+        ctx.scale(resolution, resolution);
+        ctx.font = this.font;
+        ctx.fillStyle = this.fillStyle;
+        ctx.fillText(this._text, 0, metrics.actualBoundingBoxAscent);
+        ctx.restore();
 
         UpdateGLTexture(GL.get(), canvas, this.texture.glTexture);
     }
