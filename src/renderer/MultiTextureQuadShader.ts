@@ -321,32 +321,27 @@ export default class MultiTextureQuadShader
 
         this.program = program;
         
-        const vertexPosition = gl.getAttribLocation(program, 'aVertexPosition');
-        const vertexTextureCoord = gl.getAttribLocation(program, 'aTextureCoord');
-        const vertexTextureIndex = gl.getAttribLocation(program, 'aTextureId');
-        const vertexColor = gl.getAttribLocation(program, 'aTintColor');
+        const position = gl.getAttribLocation(program, 'aVertexPosition');
+        const textureCoord = gl.getAttribLocation(program, 'aTextureCoord');
+        const textureIndex = gl.getAttribLocation(program, 'aTextureId');
+        const color = gl.getAttribLocation(program, 'aTintColor');
 
-        const uProjectionMatrix = gl.getUniformLocation(program, 'uProjectionMatrix');
-        const uCameraMatrix = gl.getUniformLocation(program, 'uCameraMatrix');
-        const uTextureLocation = gl.getUniformLocation(program, 'uTexture');
+        gl.enableVertexAttribArray(position);
+        gl.enableVertexAttribArray(textureCoord);
+        gl.enableVertexAttribArray(textureIndex);
+        gl.enableVertexAttribArray(color);
 
-        gl.enableVertexAttribArray(vertexPosition);
-        gl.enableVertexAttribArray(vertexTextureCoord);
-        gl.enableVertexAttribArray(vertexTextureIndex);
-        gl.enableVertexAttribArray(vertexColor);
-
-        //  TODO - Can optimize size by using same variable names
         this.attribs = {
-            position: vertexPosition,
-            textureCoord: vertexTextureCoord,
-            textureIndex: vertexTextureIndex,
-            color: vertexColor
+            position,
+            textureCoord,
+            textureIndex,
+            color
         };
 
         this.uniforms = {
-            projectionMatrix: uProjectionMatrix,
-            cameraMatrix: uCameraMatrix,
-            textureLocation: uTextureLocation
+            projectionMatrix: gl.getUniformLocation(program, 'uProjectionMatrix'),
+            cameraMatrix: gl.getUniformLocation(program, 'uCameraMatrix'),
+            textureLocation: gl.getUniformLocation(program, 'uTexture')
         };
     }
 
